@@ -1,0 +1,48 @@
+{
+  "project_info": {
+    "project_number": "286354391838",
+    "firebase_url": "https://unifyu2-default-rtdb.firebaseio.com",
+    "project_id": "unifyu2",
+    "storage_bucket": "unifyu2.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:286354391838:android:77bb0027e2d8dd2499ff0f",
+        "android_client_info": {
+          "package_name": "com.example.unifyu2"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "286354391838-7mtsphc5bstg9a6cq9bociukus7159er.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.unifyu2",
+            "certificate_hash": "e6d3984f9554b3717dc89e22b06b47f64311ddbe"
+          }
+        },
+        {
+          "client_id": "286354391838-9o379m3ec75tvqn7r81c8lmmtaohj12n.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBu1WYQi3z6fX1Omk9ho47hHgLzrDiwiQg"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "286354391838-9o379m3ec75tvqn7r81c8lmmtaohj12n.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
