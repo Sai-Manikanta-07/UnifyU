@@ -11,6 +11,7 @@ import android.util.Log;
 import android.os.Looper;
 
 import androidx.fragment.app.Fragment;
+import androidx.appcompat.app.AlertDialog;
 import com.example.unifyu2.R;
 import com.example.unifyu2.models.User;
 import com.example.unifyu2.adapters.ProfilePagerAdapter;
@@ -29,9 +30,11 @@ import androidx.viewpager2.widget.ViewPager2;
 import com.google.firebase.auth.UserProfileChangeRequest;
 import java.util.HashMap;
 import java.util.Map;
+import android.widget.Spinner;
+import android.widget.ArrayAdapter;
 
 public class ProfileFragment extends Fragment {
-    private TextView usernameText, emailText;
+    private TextView usernameText, emailText, rollNumberText, semesterText;
     private View progressBar;
     private FirebaseAuth firebaseAuth;
     private TabLayout tabLayout;
@@ -45,6 +48,8 @@ public class ProfileFragment extends Fragment {
         // Initialize views
         usernameText = view.findViewById(R.id.usernameText);
         emailText = view.findViewById(R.id.emailText);
+        rollNumberText = view.findViewById(R.id.rollNumberText);
+        semesterText = view.findViewById(R.id.semesterText);
         progressBar = view.findViewById(R.id.progressBar);
 
         // Initialize Firebase
@@ -116,10 +121,30 @@ public class ProfileFragment extends Fragment {
                         if (userData != null) {
                             usernameText.setText(userData.getUsername());
                             emailText.setText(userData.getEmail());
+                            
+                            // Set roll number and semester if they exist
+                            String rollNumber = userData.getRollNumber();
+                            String semester = userData.getSemester();
+                            
+                            if (rollNumber != null && !rollNumber.isEmpty()) {
+                                rollNumberText.setText("Roll: " + rollNumber);
+                                rollNumberText.setVisibility(View.VISIBLE);
+                            } else {
+                                rollNumberText.setVisibility(View.GONE);
+                            }
+                            
+                            if (semester != null && !semester.isEmpty()) {
+                                semesterText.setText("Semester: " + semester);
+                                semesterText.setVisibility(View.VISIBLE);
+                            } else {
+                                semesterText.setVisibility(View.GONE);
+                            }
                         } else {
                             // If user data doesn't exist in database, use Auth data
                             usernameText.setText(user.getDisplayName());
                             emailText.setText(user.getEmail());
+                            rollNumberText.setVisibility(View.GONE);
+                            semesterText.setVisibility(View.GONE);
                             
                             // Create user in database if it doesn't exist
                             User newUser = new User(user.getUid(), 
@@ -184,144 +209,145 @@ public class ProfileFragment extends Fragment {
     private void showEditProfileDialog() {
         View dialogView = LayoutInflater.from(getContext())
             .inflate(R.layout.dialog_edit_profile, null);
+        
         TextInputEditText usernameEdit = dialogView.findViewById(R.id.usernameEditText);
+        TextInputEditText rollNumberEdit = dialogView.findViewById(R.id.rollNumberEditText);
+        Spinner semesterSpinner = dialogView.findViewById(R.id.semesterSpinner);
         
-        usernameEdit.setText(firebaseAuth.getCurrentUser().getDisplayName());
-
-        new MaterialAlertDialogBuilder(requireContext())
-            .setTitle("Edit Profile")
-            .setView(dialogView)
-            .setPositiveButton("Save", (dialog, which) -> {
-                String newUsername = usernameEdit.getText().toString().trim();
-                if (!newUsername.isEmpty()) {
-                    updateProfile(newUsername);
-                }
-            })
-            .setNegativeButton("Cancel", null)
-            .show();
-    }
-
-    private void updateProfile(String newUsername) {
-        // Check connection first
-        DatabaseReference connectedRef = FirebaseDatabase.getInstance().getReference(".info/connected");
-        connectedRef.get().addOnCompleteListener(task -> {
-            if (task.isSuccessful()) {
-                Boolean connected = task.getResult().getValue(Boolean.class);
-                if (connected == null || !connected) {
-                    Toast.makeText(getContext(), 
-                        "You are offline. Please check your internet connection.", 
-                        Toast.LENGTH_LONG).show();
-                    return;
-                }
-                
-                // Proceed with update if online
-                performProfileUpdate(newUsername);
-            } else {
-                Toast.makeText(getContext(), 
-                    "Cannot check connection status. Please try again.", 
-                    Toast.LENGTH_LONG).show();
-            }
-        });
-    }
-
-    private void performProfileUpdate(String newUsername) {
-        Log.d("ProfileUpdate", "Starting profile update for username: " + newUsername);
+        // Setup semester spinner with Material style
+        String[] semesters = new String[]{"Select Semester", "1st Semester", "2nd Semester", 
+            "3rd Semester", "4th Semester", "5th Semester", "6th Semester", 
+            "7th Semester", "8th Semester"};
+        ArrayAdapter<String> adapter = new ArrayAdapter<>(
+            requireContext(), 
+            R.layout.simple_spinner_item,  // Use custom layout
+            semesters
+        );
+        adapter.setDropDownViewResource(android.R.layout.simple_spinner_dropdown_item);
+        semesterSpinner.setAdapter(adapter);
         
-        if (!isAdded() || getContext() == null) {
-            Log.e("ProfileUpdate", "Fragment not attached or context is null");
-            return;
-        }
-        
-        progressBar.setVisibility(View.VISIBLE);
-        Log.d("ProfileUpdate", "Progress bar shown");
-
+        // Set current values
         FirebaseUser user = firebaseAuth.getCurrentUser();
-        if (user == null) {
-            Log.e("ProfileUpdate", "User is null");
-            progressBar.setVisibility(View.GONE);
-            Toast.makeText(getContext(), "User not logged in", Toast.LENGTH_SHORT).show();
-            return;
-        }
-
-        Log.d("ProfileUpdate", "Current user ID: " + user.getUid());
-
-        requireActivity().runOnUiThread(() -> {
-            try {
-                // First update Auth profile
-                UserProfileChangeRequest profileUpdates = new UserProfileChangeRequest.Builder()
-                    .setDisplayName(newUsername)
-                    .build();
-
-                Log.d("ProfileUpdate", "Updating Auth profile...");
-                user.updateProfile(profileUpdates)
-                    .addOnSuccessListener(aVoid -> {
-                        Log.d("ProfileUpdate", "Auth profile updated successfully");
-                        if (!isAdded() || getContext() == null) {
-                            Log.e("ProfileUpdate", "Fragment not attached after Auth update");
-                            return;
-                        }
-
-                        try {
-                            // Then update database
-                            DatabaseReference userRef = FirebaseDatabase.getInstance()
-                                .getReference("users")
-                                .child(user.getUid());
-
-                            Map<String, Object> updates = new HashMap<>();
-                            updates.put("id", user.getUid());
-                            updates.put("username", newUsername);
-                            updates.put("email", user.getEmail());
-
-                            Log.d("ProfileUpdate", "Updating database...");
-                            userRef.updateChildren(updates)
-                                .addOnSuccessListener(aVoid2 -> {
-                                    Log.d("ProfileUpdate", "Database updated successfully");
-                                    if (!isAdded() || getContext() == null) {
-                                        Log.e("ProfileUpdate", "Fragment not attached after DB update");
-                                        return;
-                                    }
-                                    progressBar.setVisibility(View.GONE);
-                                    Toast.makeText(getContext(), 
-                                        "Profile updated successfully", Toast.LENGTH_SHORT).show();
-                                    
-                                    // Reload profile after short delay
-                                    new Handler(Looper.getMainLooper()).postDelayed(() -> {
-                                        if (isAdded() && getContext() != null) {
-                                            loadUserProfile();
-                                        }
-                                    }, 500);
-                                })
-                                .addOnFailureListener(e -> {
-                                    Log.e("ProfileUpdate", "Database update failed", e);
-                                    if (!isAdded() || getContext() == null) return;
-                                    progressBar.setVisibility(View.GONE);
-                                    String error = "Database Error: " + e.getMessage();
-                                    Toast.makeText(getContext(), error, Toast.LENGTH_LONG).show();
-                                });
-                        } catch (Exception e) {
-                            Log.e("ProfileUpdate", "Database update error", e);
-                            if (isAdded() && getContext() != null) {
-                                progressBar.setVisibility(View.GONE);
-                                Toast.makeText(getContext(), 
-                                    "Database Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
+        if (user != null) {
+            DatabaseReference userRef = FirebaseDatabase.getInstance()
+                .getReference("users")
+                .child(user.getUid());
+            
+            userRef.get().addOnSuccessListener(snapshot -> {
+                if (!isAdded() || getContext() == null) return;
+                
+                User userData = snapshot.getValue(User.class);
+                if (userData != null) {
+                    usernameEdit.setText(userData.getUsername());
+                    rollNumberEdit.setText(userData.getRollNumber());
+                    
+                    // Set spinner selection if semester exists
+                    String currentSemester = userData.getSemester();
+                    if (currentSemester != null && !currentSemester.isEmpty()) {
+                        for (int i = 0; i < semesters.length; i++) {
+                            if (semesters[i].equals(currentSemester)) {
+                                semesterSpinner.setSelection(i);
+                                break;
                             }
                         }
-                    })
-                    .addOnFailureListener(e -> {
-                        Log.e("ProfileUpdate", "Auth update failed", e);
-                        if (!isAdded() || getContext() == null) return;
-                        progressBar.setVisibility(View.GONE);
-                        String error = "Auth Error: " + e.getMessage();
-                        Toast.makeText(getContext(), error, Toast.LENGTH_LONG).show();
-                    });
-            } catch (Exception e) {
-                Log.e("ProfileUpdate", "Profile update error", e);
-                if (isAdded() && getContext() != null) {
-                    progressBar.setVisibility(View.GONE);
-                    Toast.makeText(getContext(), 
-                        "Error: " + e.getMessage(), Toast.LENGTH_LONG).show();
+                    }
                 }
+            });
+        }
+
+        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(requireContext())
+            .setTitle("Edit Profile")
+            .setView(dialogView)
+            .setPositiveButton("Save", null)  // Set to null initially
+            .setNegativeButton("Cancel", null);
+
+        AlertDialog dialog = builder.create();
+        dialog.show();
+
+        // Set click listener after dialog is shown to prevent automatic dismiss
+        dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+            String newUsername = usernameEdit.getText().toString().trim();
+            String newRollNumber = rollNumberEdit.getText().toString().trim();
+            String newSemester = semesterSpinner.getSelectedItemPosition() == 0 ? 
+                "" : semesterSpinner.getSelectedItem().toString();
+            
+            if (newUsername.isEmpty()) {
+                Toast.makeText(getContext(), "Username cannot be empty", Toast.LENGTH_SHORT).show();
+                return;
             }
+
+            // Show progress in dialog
+            View progressView = dialogView.findViewById(R.id.progressBar);
+            if (progressView != null) {
+                progressView.setVisibility(View.VISIBLE);
+            }
+
+            performProfileUpdate(newUsername, newRollNumber, newSemester, dialog);
         });
+    }
+
+    private void performProfileUpdate(String newUsername, String newRollNumber, String newSemester, AlertDialog dialog) {
+        if (!isAdded() || getContext() == null) return;
+        
+        FirebaseUser user = firebaseAuth.getCurrentUser();
+        
+        if (user == null) {
+            Toast.makeText(getContext(), "User not logged in", Toast.LENGTH_SHORT).show();
+            dialog.dismiss();
+            return;
+        }
+
+        // Update Auth profile
+        UserProfileChangeRequest profileUpdates = new UserProfileChangeRequest.Builder()
+            .setDisplayName(newUsername)
+            .build();
+
+        user.updateProfile(profileUpdates)
+            .addOnCompleteListener(task -> {
+                if (!isAdded() || getContext() == null) return;
+
+                if (task.isSuccessful()) {
+                    // Update database with all user fields
+                    DatabaseReference userRef = FirebaseDatabase.getInstance()
+                        .getReference("users")
+                        .child(user.getUid());
+
+                    Map<String, Object> updates = new HashMap<>();
+                    updates.put("id", user.getUid());
+                    updates.put("username", newUsername);
+                    updates.put("email", user.getEmail());
+                    
+                    // Only update roll number and semester if they are not empty
+                    if (!newRollNumber.isEmpty()) {
+                        updates.put("rollNumber", newRollNumber);
+                    }
+                    if (!newSemester.isEmpty()) {
+                        updates.put("semester", newSemester);
+                    }
+
+                    userRef.updateChildren(updates)
+                        .addOnSuccessListener(aVoid -> {
+                            if (!isAdded() || getContext() == null) return;
+                            dialog.dismiss();
+                            Toast.makeText(getContext(), 
+                                "Profile updated successfully", 
+                                Toast.LENGTH_SHORT).show();
+                            loadUserProfile();
+                        })
+                        .addOnFailureListener(e -> {
+                            if (!isAdded() || getContext() == null) return;
+                            dialog.dismiss();
+                            Log.e("ProfileUpdate", "Database update failed", e);
+                            Toast.makeText(getContext(),
+                                "Failed to update profile: " + e.getMessage(), 
+                                Toast.LENGTH_SHORT).show();
+                        });
+                } else {
+                    dialog.dismiss();
+                    Toast.makeText(getContext(),
+                        "Failed to update profile", 
+                        Toast.LENGTH_SHORT).show();
+                }
+            });
     }
 } 

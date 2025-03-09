@@ -6,6 +6,8 @@ public class User {
     private String id;
     private String username;
     private String email;
+    private String rollNumber;
+    private String semester;
 
     // Required empty constructor for Firebase
     public User() {}
@@ -33,4 +35,16 @@ public class User {
     
     @PropertyName("email")
     public void setEmail(String email) { this.email = email; }
+
+    @PropertyName("rollNumber")
+    public String getRollNumber() { return rollNumber != null ? rollNumber : ""; }
+    
+    @PropertyName("rollNumber")
+    public void setRollNumber(String rollNumber) { this.rollNumber = rollNumber; }
+
+    @PropertyName("semester")
+    public String getSemester() { return semester != null ? semester : ""; }
+    
+    @PropertyName("semester")
+    public void setSemester(String semester) { this.semester = semester; }
 } 
