@@ -67,7 +67,7 @@ public class ClubFeedFragment extends Fragment implements PostAdapter.OnPostInte
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         try {
-            View view = inflater.inflate(R.layout.fragment_club_feed, container, false);
+        View view = inflater.inflate(R.layout.fragment_club_feed, container, false);
 
             // Initialize Firebase
             firebaseAuth = FirebaseAuth.getInstance();
@@ -78,26 +78,26 @@ public class ClubFeedFragment extends Fragment implements PostAdapter.OnPostInte
             Log.d(TAG, "Posts Reference: " + postsRef.toString());
             Log.d(TAG, "Club IDs at fragment creation: " + clubIds);
 
-            // Initialize views
+        // Initialize views
             recyclerView = view.findViewById(R.id.recyclerView);
             swipeRefreshLayout = view.findViewById(R.id.swipeRefreshLayout);
             emptyStateContainer = view.findViewById(R.id.emptyStateContainer);
-            emptyView = view.findViewById(R.id.emptyView);
-            progressBar = view.findViewById(R.id.progressBar);
-            createPostFab = view.findViewById(R.id.createPostFab);
+        emptyView = view.findViewById(R.id.emptyView);
+        progressBar = view.findViewById(R.id.progressBar);
+        createPostFab = view.findViewById(R.id.createPostFab);
 
             // Initialize RecyclerView
             recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
             adapter = new PostAdapter(requireContext(), this);
             recyclerView.setAdapter(adapter);
 
-            // Setup SwipeRefreshLayout
+        // Setup SwipeRefreshLayout
             swipeRefreshLayout.setOnRefreshListener(this::loadPosts);
 
-            // Setup FAB
-            createPostFab.setOnClickListener(v -> showCreatePostDialog());
+        // Setup FAB
+        createPostFab.setOnClickListener(v -> showCreatePostDialog());
 
-            // Load initial data
+        // Load initial data
             if (clubIds.isEmpty()) {
                 Log.d(TAG, "No club IDs available, showing empty view");
                 showEmptyView();
@@ -107,7 +107,7 @@ public class ClubFeedFragment extends Fragment implements PostAdapter.OnPostInte
                 loadPosts();
             }
 
-            return view;
+        return view;
         } catch (Exception e) {
             Log.e(TAG, "Error in onCreateView", e);
             Toast.makeText(getContext(), "Error initializing feed: " + e.getMessage(), 
@@ -130,7 +130,7 @@ public class ClubFeedFragment extends Fragment implements PostAdapter.OnPostInte
 
         if (feedListener != null) {
             postsRef.removeEventListener(feedListener);
-        }
+    }
 
         progressBar.setVisibility(View.VISIBLE);
         emptyStateContainer.setVisibility(View.GONE);
@@ -143,8 +143,8 @@ public class ClubFeedFragment extends Fragment implements PostAdapter.OnPostInte
             
             // Query posts for all clubs in one go
             feedListener = postsRef.addValueEventListener(new ValueEventListener() {
-                @Override
-                public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                    @Override
+                    public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
                     if (!isAdded() || getContext() == null) {
                         Log.d(TAG, "Fragment not attached during data change");
                         return;
@@ -222,10 +222,10 @@ public class ClubFeedFragment extends Fragment implements PostAdapter.OnPostInte
                         progressBar.setVisibility(View.GONE);
                         swipeRefreshLayout.setRefreshing(false);
                     }
-                }
+                    }
 
-                @Override
-                public void onCancelled(@NonNull DatabaseError databaseError) {
+                    @Override
+                    public void onCancelled(@NonNull DatabaseError databaseError) {
                     if (!isAdded() || getContext() == null) return;
                     Log.e(TAG, "Database error", databaseError.toException());
                     showError("Error loading posts: " + databaseError.getMessage());

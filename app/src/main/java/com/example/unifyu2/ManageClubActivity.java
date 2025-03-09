@@ -52,10 +52,12 @@ public class ManageClubActivity extends AppCompatActivity {
     private DatabaseReference clubRef;
     private DatabaseReference postsRef;
     private DatabaseReference membershipsRef;
+    private DatabaseReference usersRef;
     private StorageReference storageRef;
     private PostAdapter postAdapter;
     private Uri selectedImageUri;
     private ActivityResultLauncher<Intent> imagePickerLauncher;
+    private View progressBar;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -64,17 +66,28 @@ public class ManageClubActivity extends AppCompatActivity {
 
         // Get club data from intent
         club = getIntent().getParcelableExtra("club");
-        
+        if (club == null) {
+            Toast.makeText(this, "Error loading club data", Toast.LENGTH_SHORT).show();
+            finish();
+            return;
+        }
+
         // Initialize Firebase refs
         clubRef = FirebaseDatabase.getInstance().getReference("clubs").child(club.getId());
         postsRef = FirebaseDatabase.getInstance().getReference("posts");
         membershipsRef = FirebaseDatabase.getInstance().getReference("memberships");
+        usersRef = FirebaseDatabase.getInstance().getReference("users");
         storageRef = FirebaseStorage.getInstance().getReference();
+
+        // Initialize views
+        progressBar = findViewById(R.id.progressBar);
 
         // Setup toolbar
         setSupportActionBar(findViewById(R.id.toolbar));
-        getSupportActionBar().setDisplayHomeAsUpEnabled(true);
-        getSupportActionBar().setTitle("Manage " + club.getName());
+        if (getSupportActionBar() != null) {
+            getSupportActionBar().setDisplayHomeAsUpEnabled(true);
+            getSupportActionBar().setTitle("Manage " + club.getName());
+        }
 
         // Setup image picker
         imagePickerLauncher = registerForActivityResult(
@@ -213,93 +226,100 @@ public class ManageClubActivity extends AppCompatActivity {
     }
 
     private void showMembersDialog() {
-        View dialogView = getLayoutInflater().inflate(R.layout.dialog_members_list, null);
-        RecyclerView recyclerView = dialogView.findViewById(R.id.membersRecyclerView);
-        TextView memberCountText = dialogView.findViewById(R.id.memberCountText);
-        View progressBar = dialogView.findViewById(R.id.progressBar);
+        View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_members_list, null);
+        RecyclerView membersRecyclerView = dialogView.findViewById(R.id.membersRecyclerView);
+        View dialogProgressBar = dialogView.findViewById(R.id.progressBar);
 
-        recyclerView.setLayoutManager(new LinearLayoutManager(this));
-        
-        AlertDialog dialog = new MaterialAlertDialogBuilder(this)
-            .setTitle(R.string.club_members)
+        MaterialAlertDialogBuilder builder = new MaterialAlertDialogBuilder(this)
+            .setTitle("Club Members")
             .setView(dialogView)
-            .setPositiveButton(R.string.close, null)
-            .create();
+            .setPositiveButton("Close", null);
 
-        progressBar.setVisibility(View.VISIBLE);
+        androidx.appcompat.app.AlertDialog dialog = builder.create();
 
-        // Get club members
-        DatabaseReference membershipsRef = FirebaseDatabase.getInstance()
-            .getReference("memberships");
-        DatabaseReference usersRef = FirebaseDatabase.getInstance()
-            .getReference("users");
+        // Setup RecyclerView
+        membersRecyclerView.setLayoutManager(new LinearLayoutManager(this));
+        List<User> members = new ArrayList<>();
+        MembersAdapter adapter = new MembersAdapter(members, user -> {
+            // Show make admin confirmation dialog
+            if (!user.getId().equals(FirebaseAuth.getInstance().getCurrentUser().getUid())) {
+                showMakeAdminDialog(user, dialog);
+            }
+        });
+        membersRecyclerView.setAdapter(adapter);
 
-        // Query memberships for this club
-        membershipsRef.orderByChild("clubId")
-            .equalTo(club.getId())
+        // Load members
+        dialogProgressBar.setVisibility(View.VISIBLE);
+        membershipsRef.orderByChild("clubId").equalTo(club.getId())
             .addListenerForSingleValueEvent(new ValueEventListener() {
                 @Override
-                public void onDataChange(@NonNull DataSnapshot snapshot) {
+                public void onDataChange(DataSnapshot membershipsSnapshot) {
                     List<String> memberIds = new ArrayList<>();
-                    for (DataSnapshot membershipSnapshot : snapshot.getChildren()) {
+                    for (DataSnapshot membershipSnapshot : membershipsSnapshot.getChildren()) {
                         ClubMembership membership = membershipSnapshot.getValue(ClubMembership.class);
                         if (membership != null) {
                             memberIds.add(membership.getUserId());
                         }
                     }
 
-                    if (memberIds.isEmpty()) {
-                        progressBar.setVisibility(View.GONE);
-                        memberCountText.setText(getString(R.string.member_count, 0));
-                        return;
-                    }
-
-                    List<User> members = new ArrayList<>();
-                    AtomicInteger counter = new AtomicInteger(memberIds.size());
-
-                    for (String userId : memberIds) {
-                        usersRef.child(userId).get().addOnCompleteListener(task -> {
-                            if (task.isSuccessful() && task.getResult().exists()) {
-                                User user = task.getResult().getValue(User.class);
+                    // Load user details for each member
+                    for (String memberId : memberIds) {
+                        usersRef.child(memberId).addListenerForSingleValueEvent(new ValueEventListener() {
+                            @Override
+                            public void onDataChange(DataSnapshot userSnapshot) {
+                                User user = userSnapshot.getValue(User.class);
                                 if (user != null) {
+                                    user.setId(userSnapshot.getKey());
                                     members.add(user);
+                                    adapter.notifyDataSetChanged();
+                                }
+                                if (members.size() == memberIds.size()) {
+                                    dialogProgressBar.setVisibility(View.GONE);
                                 }
                             }
 
-                            if (counter.decrementAndGet() == 0) {
-                                progressBar.setVisibility(View.GONE);
-                                memberCountText.setText(getString(R.string.member_count, members.size()));
-                                
-                                MembersAdapter adapter = new MembersAdapter(members, club.getId(), 
-                                    club.getAdminId(), new MembersAdapter.OnMemberActionListener() {
-                                        @Override
-                                        public void onMemberRemoved(User user) {
-                                            removeMember(user.getId());
-                                            dialog.dismiss();
-                                        }
-
-                                        @Override
-                                        public void onMakeAdmin(User user) {
-                                            makeUserAdmin(user.getId(), club.getId());
-                                            dialog.dismiss();
-                                        }
-                                    });
-                                recyclerView.setAdapter(adapter);
+                            @Override
+                            public void onCancelled(DatabaseError error) {
+                                dialogProgressBar.setVisibility(View.GONE);
+                                Toast.makeText(ManageClubActivity.this,
+                                    "Error loading member details", Toast.LENGTH_SHORT).show();
                             }
                         });
                     }
                 }
 
                 @Override
-                public void onCancelled(@NonNull DatabaseError error) {
-                    progressBar.setVisibility(View.GONE);
-                    Toast.makeText(ManageClubActivity.this, 
-                        "Error loading members: " + error.getMessage(), 
-                        Toast.LENGTH_SHORT).show();
+                public void onCancelled(DatabaseError error) {
+                    dialogProgressBar.setVisibility(View.GONE);
+                    Toast.makeText(ManageClubActivity.this,
+                        "Error loading members", Toast.LENGTH_SHORT).show();
                 }
             });
 
         dialog.show();
+    }
+
+    private void showMakeAdminDialog(User user, androidx.appcompat.app.AlertDialog membersDialog) {
+        new MaterialAlertDialogBuilder(this)
+            .setTitle("Make Admin")
+            .setMessage("Are you sure you want to make " + user.getUsername() + " the admin of this club? " +
+                       "You will no longer be the admin.")
+            .setPositiveButton("Confirm", (dialog, which) -> {
+                // Update admin
+                clubRef.child("adminId").setValue(user.getId())
+                    .addOnSuccessListener(aVoid -> {
+                        Toast.makeText(this, user.getUsername() + " is now the admin", 
+                            Toast.LENGTH_SHORT).show();
+                        membersDialog.dismiss();
+                        finish(); // Close the manage activity since user is no longer admin
+                    })
+                    .addOnFailureListener(e -> 
+                        Toast.makeText(this, "Failed to update admin: " + e.getMessage(), 
+                            Toast.LENGTH_SHORT).show()
+                    );
+            })
+            .setNegativeButton("Cancel", null)
+            .show();
     }
 
     private void showEditClubDialog() {
@@ -372,54 +392,6 @@ public class ManageClubActivity extends AppCompatActivity {
                         "Error loading posts", Toast.LENGTH_SHORT).show();
                 }
             });
-    }
-
-    private void makeUserAdmin(String userId, String clubId) {
-        DatabaseReference clubRef = FirebaseDatabase.getInstance().getReference("clubs").child(clubId);
-        
-        Map<String, Object> updates = new HashMap<>();
-        updates.put("adminId", userId);
-
-        clubRef.updateChildren(updates)
-            .addOnSuccessListener(aVoid -> {
-                Toast.makeText(this, "Admin rights transferred successfully", Toast.LENGTH_SHORT).show();
-            })
-            .addOnFailureListener(e -> 
-                Toast.makeText(this, "Failed to transfer admin rights", Toast.LENGTH_SHORT).show()
-            );
-    }
-
-    private void removeMember(String userId) {
-        // First remove the membership
-        String membershipId = userId + "_" + club.getId();
-        membershipsRef.child(membershipId).removeValue()
-            .addOnSuccessListener(aVoid -> {
-                // Then decrement the member count
-                DatabaseReference memberCountRef = clubRef.child("memberCount");
-                memberCountRef.get().addOnCompleteListener(task -> {
-                    if (task.isSuccessful()) {
-                        Integer currentCount = task.getResult().getValue(Integer.class);
-                        if (currentCount != null && currentCount > 0) {
-                            memberCountRef.setValue(currentCount - 1)
-                                .addOnSuccessListener(aVoid2 -> {
-                                    Toast.makeText(this, 
-                                        getString(R.string.member_removed), 
-                                        Toast.LENGTH_SHORT).show();
-                                })
-                                .addOnFailureListener(e -> 
-                                    Toast.makeText(this, 
-                                        getString(R.string.member_remove_failed), 
-                                        Toast.LENGTH_SHORT).show()
-                                );
-                        }
-                    }
-                });
-            })
-            .addOnFailureListener(e -> 
-                Toast.makeText(this, 
-                    getString(R.string.member_remove_failed), 
-                    Toast.LENGTH_SHORT).show()
-            );
     }
 
     @Override

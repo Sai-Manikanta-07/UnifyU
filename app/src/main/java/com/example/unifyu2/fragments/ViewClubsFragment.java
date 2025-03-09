@@ -14,11 +14,13 @@ import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
 import com.example.unifyu2.R;
+import com.example.unifyu2.CreateClubActivity;
 import com.example.unifyu2.ManageClubActivity;
 import com.example.unifyu2.adapters.ClubAdapter;
 import com.example.unifyu2.models.Club;
 import com.example.unifyu2.models.ClubMembership;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
+import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
@@ -34,6 +36,7 @@ public class ViewClubsFragment extends Fragment implements ClubAdapter.OnClubCli
     private ClubAdapter adapter;
     private View progressBar;
     private TextView emptyView;
+    private ExtendedFloatingActionButton createClubFab;
     private DatabaseReference clubsRef;
     private DatabaseReference membershipsRef;
     private FirebaseAuth firebaseAuth;
@@ -47,6 +50,7 @@ public class ViewClubsFragment extends Fragment implements ClubAdapter.OnClubCli
         recyclerView = view.findViewById(R.id.clubsRecyclerView);
         progressBar = view.findViewById(R.id.progressBar);
         emptyView = view.findViewById(R.id.emptyView);
+        createClubFab = view.findViewById(R.id.createClubFab);
 
         // Initialize Firebase first
         firebaseAuth = FirebaseAuth.getInstance();
@@ -58,6 +62,12 @@ public class ViewClubsFragment extends Fragment implements ClubAdapter.OnClubCli
         String currentUserId = firebaseAuth.getCurrentUser().getUid();
         adapter = new ClubAdapter(new ArrayList<>(), this, currentUserId);
         recyclerView.setAdapter(adapter);
+        
+        // Setup FAB
+        createClubFab.setOnClickListener(v -> {
+            Intent intent = new Intent(getContext(), CreateClubActivity.class);
+            startActivity(intent);
+        });
         
         loadClubs();
 

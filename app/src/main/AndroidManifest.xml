@@ -57,6 +57,12 @@
             android:name=".ManageClubActivity"
             android:label="Manage Club"
             android:parentActivityName=".MainActivity" />
+
+        <activity
+            android:name=".CreateClubActivity"
+            android:label="Create Club"
+            android:parentActivityName=".MainActivity"
+            android:windowSoftInputMode="adjustResize" />
         
         <activity
             android:name=".UserDetailsActivity"

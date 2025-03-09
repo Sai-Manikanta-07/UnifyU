@@ -31,4 +31,7 @@
     <color name="reaction_wow">#FF9800</color>
     <color name="reaction_sad">#607D8B</color>
     <color name="reaction_angry">#F44336</color>
+
+    <color name="admin_chip_color">#FF1976D2</color>
+    <color name="member_chip_color">#FF43A047</color>
 </resources>
