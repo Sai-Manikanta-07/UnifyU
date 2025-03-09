@@ -19,7 +19,7 @@ import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
 import com.example.unifyu2.R;
 import com.example.unifyu2.adapters.PostAdapter;
 import com.example.unifyu2.models.Post;
-import com.google.android.material.floatingactionbutton.FloatingActionButton;
+import com.google.android.material.floatingactionbutton.ExtendedFloatingActionButton;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
@@ -38,9 +38,10 @@ public class ClubFeedFragment extends Fragment implements PostAdapter.OnPostInte
     private static final String TAG = "ClubFeedFragment";
     private RecyclerView recyclerView;
     private SwipeRefreshLayout swipeRefreshLayout;
+    private View emptyStateContainer;
     private TextView emptyView;
     private View progressBar;
-    private FloatingActionButton createPostFab;
+    private ExtendedFloatingActionButton createPostFab;
     private PostAdapter adapter;
     private Set<String> clubIds;
     private DatabaseReference postsRef;
@@ -80,6 +81,7 @@ public class ClubFeedFragment extends Fragment implements PostAdapter.OnPostInte
             // Initialize views
             recyclerView = view.findViewById(R.id.recyclerView);
             swipeRefreshLayout = view.findViewById(R.id.swipeRefreshLayout);
+            emptyStateContainer = view.findViewById(R.id.emptyStateContainer);
             emptyView = view.findViewById(R.id.emptyView);
             progressBar = view.findViewById(R.id.progressBar);
             createPostFab = view.findViewById(R.id.createPostFab);
@@ -131,7 +133,8 @@ public class ClubFeedFragment extends Fragment implements PostAdapter.OnPostInte
         }
 
         progressBar.setVisibility(View.VISIBLE);
-        emptyView.setVisibility(View.GONE);
+        emptyStateContainer.setVisibility(View.GONE);
+        recyclerView.setVisibility(View.GONE);
 
         try {
             Log.d(TAG, "Starting to load posts from: " + postsRef.toString());
@@ -210,7 +213,7 @@ public class ClubFeedFragment extends Fragment implements PostAdapter.OnPostInte
                             Log.d(TAG, "Setting " + posts.size() + " posts to adapter");
                             adapter.setPosts(posts);
                             recyclerView.setVisibility(View.VISIBLE);
-                            emptyView.setVisibility(View.GONE);
+                            emptyStateContainer.setVisibility(View.GONE);
                         }
                     } catch (Exception e) {
                         Log.e(TAG, "Error processing posts", e);
@@ -253,8 +256,7 @@ public class ClubFeedFragment extends Fragment implements PostAdapter.OnPostInte
         progressBar.setVisibility(View.GONE);
         swipeRefreshLayout.setRefreshing(false);
         recyclerView.setVisibility(View.GONE);
-        emptyView.setVisibility(View.VISIBLE);
-        emptyView.setText("No posts available");
+        emptyStateContainer.setVisibility(View.VISIBLE);
         Log.d(TAG, "Showing empty view");
     }
 
@@ -271,67 +273,35 @@ public class ClubFeedFragment extends Fragment implements PostAdapter.OnPostInte
         if (!isAdded() || getContext() == null) return;
         
         String userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
-        DatabaseReference postRef = postsRef.child(post.getPostId());
-        DatabaseReference likeRef = postRef.child("reactedUsers").child("like");
+        DatabaseReference likeRef = postsRef.child(post.getPostId()).child("reactedUsers").child("LIKE");
         
-        // Check if user has already reacted
-        if (post.getReactedUsers() != null && 
-            post.getReactedUsers().containsKey("like") &&
-            post.getReactedUsers().get("like").contains(userId)) {
-            // Remove user from the like list
-            likeRef.addListenerForSingleValueEvent(new ValueEventListener() {
-                @Override
-                public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
-                    List<String> likedUsers = new ArrayList<>();
-                    for (DataSnapshot child : dataSnapshot.getChildren()) {
-                        String likedUserId = child.getValue(String.class);
-                        if (likedUserId != null && !likedUserId.equals(userId)) {
-                            likedUsers.add(likedUserId);
-                        }
-                    }
-                    if (likedUsers.isEmpty()) {
-                        likeRef.removeValue();
-                    } else {
-                        likeRef.setValue(likedUsers);
+        likeRef.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                List<String> likedUsers = new ArrayList<>();
+                for (DataSnapshot child : dataSnapshot.getChildren()) {
+                    String likedUserId = child.getValue(String.class);
+                    if (likedUserId != null) {
+                        likedUsers.add(likedUserId);
                     }
                 }
+                if (!likedUsers.contains(userId)) {
+                    likedUsers.add(userId);
+                    likeRef.setValue(likedUsers)
+                        .addOnSuccessListener(aVoid -> Log.d(TAG, "Like added successfully"))
+                        .addOnFailureListener(e -> {
+                            Log.e(TAG, "Error adding like", e);
+                            Toast.makeText(getContext(), "Error adding like", Toast.LENGTH_SHORT).show();
+                        });
+                }
+            }
 
-                @Override
-                public void onCancelled(@NonNull DatabaseError databaseError) {
-                    Log.e(TAG, "Error removing like", databaseError.toException());
-                    Toast.makeText(getContext(), "Error removing like", Toast.LENGTH_SHORT).show();
-                }
-            });
-        } else {
-            // Add user to the like list
-            likeRef.addListenerForSingleValueEvent(new ValueEventListener() {
-                @Override
-                public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
-                    List<String> likedUsers = new ArrayList<>();
-                    for (DataSnapshot child : dataSnapshot.getChildren()) {
-                        String likedUserId = child.getValue(String.class);
-                        if (likedUserId != null) {
-                            likedUsers.add(likedUserId);
-                        }
-                    }
-                    if (!likedUsers.contains(userId)) {
-                        likedUsers.add(userId);
-                        likeRef.setValue(likedUsers)
-                            .addOnSuccessListener(aVoid -> Log.d(TAG, "Like added successfully"))
-                            .addOnFailureListener(e -> {
-                                Log.e(TAG, "Error adding like", e);
-                                Toast.makeText(getContext(), "Error adding like", Toast.LENGTH_SHORT).show();
-                            });
-                    }
-                }
-
-                @Override
-                public void onCancelled(@NonNull DatabaseError databaseError) {
-                    Log.e(TAG, "Error adding like", databaseError.toException());
-                    Toast.makeText(getContext(), "Error adding like", Toast.LENGTH_SHORT).show();
-                }
-            });
-        }
+            @Override
+            public void onCancelled(@NonNull DatabaseError databaseError) {
+                Log.e(TAG, "Error adding like", databaseError.toException());
+                Toast.makeText(getContext(), "Error adding like", Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     @Override
@@ -374,7 +344,7 @@ public class ClubFeedFragment extends Fragment implements PostAdapter.OnPostInte
             }
         }
         
-        // Then add the new reaction if it's not null
+        // Then add the new reaction
         if (reactionType != null) {
             DatabaseReference newReactionRef = postRef.child("reactedUsers").child(reactionType);
             newReactionRef.addListenerForSingleValueEvent(new ValueEventListener() {
@@ -390,7 +360,7 @@ public class ClubFeedFragment extends Fragment implements PostAdapter.OnPostInte
                     if (!reactedUsers.contains(userId)) {
                         reactedUsers.add(userId);
                         newReactionRef.setValue(reactedUsers)
-                            .addOnSuccessListener(aVoid -> Log.d(TAG, "Reaction " + reactionType + " added successfully"))
+                            .addOnSuccessListener(aVoid -> Log.d(TAG, "Reaction added successfully"))
                             .addOnFailureListener(e -> {
                                 Log.e(TAG, "Error adding reaction", e);
                                 Toast.makeText(getContext(), "Error adding reaction", Toast.LENGTH_SHORT).show();

@@ -16,6 +16,8 @@ import com.google.android.material.textfield.TextInputLayout;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.UserProfileChangeRequest;
 import com.example.unifyu2.utils.FirebaseErrorUtils;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
 
 public class RegisterActivity extends AppCompatActivity {
     private TextInputEditText usernameEditText, emailEditText, passwordEditText, confirmPasswordEditText;
@@ -97,13 +99,25 @@ public class RegisterActivity extends AppCompatActivity {
 
                         firebaseAuth.getCurrentUser().updateProfile(profileUpdates)
                                 .addOnCompleteListener(profileTask -> {
-                                    progressDialog.dismiss();
                                     if (profileTask.isSuccessful()) {
-                                        Toast.makeText(RegisterActivity.this,
-                                                getString(R.string.registration_success),
-                                                Toast.LENGTH_SHORT).show();
-                                        startActivity(new Intent(RegisterActivity.this, UserDetailsActivity.class));
-                                        finish();
+                                        // Create user in database
+                                        DatabaseReference userRef = FirebaseDatabase.getInstance()
+                                            .getReference("users")
+                                            .child(firebaseAuth.getCurrentUser().getUid());
+                                        
+                                        // Create basic user data
+                                        userRef.child("username").setValue(username);
+                                        userRef.child("email").setValue(email)
+                                            .addOnCompleteListener(dbTask -> {
+                                                progressDialog.dismiss();
+                                                if (dbTask.isSuccessful()) {
+                                                    Toast.makeText(RegisterActivity.this,
+                                                            getString(R.string.registration_success),
+                                                            Toast.LENGTH_SHORT).show();
+                                                    startActivity(new Intent(RegisterActivity.this, MainActivity.class));
+                                                    finish();
+                                                }
+                                            });
                                     }
                                 });
                     } else {

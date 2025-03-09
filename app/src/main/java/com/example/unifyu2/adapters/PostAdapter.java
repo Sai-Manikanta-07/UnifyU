@@ -53,7 +53,7 @@ public class PostAdapter extends RecyclerView.Adapter<PostAdapter.PostViewHolder
     @Override
     public void onBindViewHolder(@NonNull PostViewHolder holder, int position) {
         try {
-            Post post = posts.get(position);
+        Post post = posts.get(position);
             
             // Set basic post info with null checks
             holder.authorNameText.setText(post.getUserName() != null ? post.getUserName() : "Unknown User");
