@@ -58,6 +58,10 @@
             android:label="Manage Club"
             android:parentActivityName=".MainActivity" />
         
+        <activity
+            android:name=".UserDetailsActivity"
+            android:exported="false"/>
+        
         <service
             android:name=".services.UnifyUMessagingService"
             android:exported="false">

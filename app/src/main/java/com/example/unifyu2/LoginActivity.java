@@ -11,6 +11,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.auth.FirebaseUser;
 
 import com.example.unifyu2.utils.FirebaseErrorUtils;
 
@@ -22,10 +23,20 @@ public class LoginActivity extends AppCompatActivity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        setContentView(R.layout.activity_login);
-
+        
         // Initialize Firebase Auth
         firebaseAuth = FirebaseAuth.getInstance();
+        
+        // Check if user is already signed in
+        FirebaseUser currentUser = firebaseAuth.getCurrentUser();
+        if (currentUser != null) {
+            // User is already signed in, go to MainActivity
+            startActivity(new Intent(LoginActivity.this, MainActivity.class));
+            finish();
+            return;
+        }
+        
+        setContentView(R.layout.activity_login);
         
         // Initialize views
         emailEditText = findViewById(R.id.emailEditText);
