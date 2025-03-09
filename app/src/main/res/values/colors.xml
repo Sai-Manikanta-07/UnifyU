@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <color name="primary">#2196F3</color>
-    <color name="primary_dark">#1976D2</color>
+    <color name="primary">#1976D2</color>
+    <color name="primary_dark">#1565C0</color>
     <color name="primary_variant">#1565C0</color>
     <color name="secondary">#FFC107</color>
     <color name="secondary_dark">#FFA000</color>
@@ -19,7 +19,16 @@
     
     <color name="ripple">#33000000</color>
     <color name="divider">#1F000000</color>
+    <color name="gray">#666666</color>
 
     <color name="black">#FF000000</color>
     <color name="white">#FFFFFFFF</color>
+
+    <!-- Reaction Colors -->
+    <color name="reaction_like">#1976D2</color>
+    <color name="reaction_love">#E91E63</color>
+    <color name="reaction_haha">#FFC107</color>
+    <color name="reaction_wow">#FF9800</color>
+    <color name="reaction_sad">#607D8B</color>
+    <color name="reaction_angry">#F44336</color>
 </resources>

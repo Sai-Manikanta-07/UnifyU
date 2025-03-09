@@ -56,6 +56,7 @@
     <string name="comment">Comment</string>
     <string name="share">Share</string>
     <string name="feed">Feed</string>
+    <string name="my_posts">My Posts</string>
     <string name="clubs">Clubs</string>
     <string name="remove_member">Remove</string>
     <string name="member_removed">Member removed successfully</string>

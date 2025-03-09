@@ -92,7 +92,30 @@ public class ManageClubActivity extends AppCompatActivity {
         // Setup RecyclerView
         RecyclerView postsRecyclerView = findViewById(R.id.postsRecyclerView);
         postsRecyclerView.setLayoutManager(new LinearLayoutManager(this));
-        postAdapter = new PostAdapter(new ArrayList<>());
+        postAdapter = new PostAdapter(this, new PostAdapter.OnPostInteractionListener() {
+            @Override
+            public void onLikeClicked(Post post) {
+                // Handle like click
+                // TODO: Implement like functionality
+            }
+
+            @Override
+            public void onReactionSelected(Post post, String reactionType) {
+                // Handle reaction selection
+                // TODO: Implement reaction functionality
+            }
+
+            @Override
+            public void onLinkClicked(String url) {
+                Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+                startActivity(intent);
+            }
+
+            @Override
+            public void onImageClicked(String imageUrl) {
+                // TODO: Implement full-screen image view
+            }
+        });
         postsRecyclerView.setAdapter(postAdapter);
 
         // Setup UI
@@ -166,8 +189,16 @@ public class ManageClubActivity extends AppCompatActivity {
 
     private void savePost(String postId, String content, String imageUrl) {
         String userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
-        Post post = new Post(postId, club.getId(), content, userId);
-        post.setImageUrl(imageUrl);
+        Post post = new Post(
+            FirebaseAuth.getInstance().getCurrentUser().getUid(),
+            FirebaseAuth.getInstance().getCurrentUser().getDisplayName(),
+            content,
+            imageUrl != null ? "IMAGE" : "TEXT"
+        );
+        if (imageUrl != null) {
+            post.setImageUrl(imageUrl);
+        }
+        post.setClubId(club.getId());
         post.setClubName(club.getName());
         post.setAuthorName(FirebaseAuth.getInstance().getCurrentUser().getDisplayName());
 
@@ -312,24 +343,31 @@ public class ManageClubActivity extends AppCompatActivity {
     }
 
     private void loadClubPosts() {
-        postsRef.orderByChild("clubId").equalTo(club.getId())
-            .addValueEventListener(new ValueEventListener() {
+        postsRef.orderByChild("userId").equalTo(FirebaseAuth.getInstance().getCurrentUser().getUid())
+            .addListenerForSingleValueEvent(new ValueEventListener() {
                 @Override
-                public void onDataChange(@NonNull DataSnapshot snapshot) {
+                public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
                     List<Post> posts = new ArrayList<>();
-                    for (DataSnapshot postSnapshot : snapshot.getChildren()) {
-                        Post post = postSnapshot.getValue(Post.class);
+                    for (DataSnapshot snapshot : dataSnapshot.getChildren()) {
+                        Post post = snapshot.getValue(Post.class);
                         if (post != null) {
+                            post.setPostId(snapshot.getKey());
                             posts.add(post);
                         }
                     }
-                    Collections.sort(posts, (p1, p2) -> 
-                        Long.compare(p2.getTimestamp(), p1.getTimestamp()));
-                    postAdapter.updatePosts(posts);
+
+                    // Sort posts by timestamp (newest first)
+                    Collections.sort(posts, (p1, p2) -> {
+                        Long timestamp1 = (Long) p1.getTimestamp();
+                        Long timestamp2 = (Long) p2.getTimestamp();
+                        return timestamp2.compareTo(timestamp1);
+                    });
+
+                    postAdapter.setPosts(posts);
                 }
 
                 @Override
-                public void onCancelled(@NonNull DatabaseError error) {
+                public void onCancelled(@NonNull DatabaseError databaseError) {
                     Toast.makeText(ManageClubActivity.this,
                         "Error loading posts", Toast.LENGTH_SHORT).show();
                 }

@@ -1,6 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
-<com.google.android.material.card.MaterialCardView xmlns:android="http://schemas.android.com/apk/res/android"
+<com.google.android.material.card.MaterialCardView
+    xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:layout_marginHorizontal="8dp"
@@ -14,46 +16,167 @@
         android:orientation="vertical"
         android:padding="16dp">
 
+        <!-- Author Info -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:orientation="vertical">
+            android:orientation="horizontal"
+            android:layout_marginBottom="8dp">
 
             <TextView
-                android:id="@+id/clubNameText"
-                android:layout_width="wrap_content"
+                android:id="@+id/authorNameText"
+                android:layout_width="0dp"
                 android:layout_height="wrap_content"
+                android:layout_weight="1"
                 android:textStyle="bold"
-                android:textSize="16sp" />
-
-            <TextView
-                android:id="@+id/authorText"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:textSize="14sp"
-                android:layout_marginTop="4dp" />
+                android:textColor="?android:attr/textColorPrimary"
+                tools:text="Author Name"/>
 
             <TextView
                 android:id="@+id/timestampText"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:textSize="12sp"
-                android:textColor="?android:textColorSecondary" />
+                android:textColor="?android:attr/textColorSecondary"
+                tools:text="2 hours ago"/>
         </LinearLayout>
 
+        <!-- Content -->
         <TextView
             android:id="@+id/contentText"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="12dp"
-            android:textSize="14sp" />
+            android:layout_marginBottom="8dp"
+            android:textSize="14sp"
+            android:textColor="?android:attr/textColorPrimary"
+            tools:text="Post content goes here"/>
 
+        <!-- Image Content -->
         <ImageView
             android:id="@+id/postImage"
             android:layout_width="match_parent"
-            android:layout_height="200dp"
+            android:layout_height="wrap_content"
+            android:adjustViewBounds="true"
+            android:scaleType="fitCenter"
+            android:visibility="gone"
+            tools:visibility="visible"
+            tools:src="@tools:sample/backgrounds/scenic"/>
+
+        <!-- Link Preview -->
+        <com.google.android.material.card.MaterialCardView
+            android:id="@+id/linkPreviewCard"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
             android:layout_marginTop="8dp"
-            android:scaleType="centerCrop"
-            android:visibility="gone" />
+            android:visibility="gone"
+            app:cardCornerRadius="4dp"
+            app:strokeWidth="1dp"
+            app:strokeColor="?android:attr/textColorSecondary"
+            tools:visibility="visible">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:padding="8dp">
+
+                <TextView
+                    android:id="@+id/linkTitleText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textStyle="bold"
+                    android:textColor="?android:attr/textColorPrimary"
+                    tools:text="Link Title"/>
+
+                <TextView
+                    android:id="@+id/linkDescriptionText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textSize="12sp"
+                    android:maxLines="2"
+                    android:ellipsize="end"
+                    android:textColor="?android:attr/textColorSecondary"
+                    tools:text="Link description preview text goes here"/>
+
+                <TextView
+                    android:id="@+id/linkUrlText"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:textSize="12sp"
+                    android:textColor="?android:attr/textColorSecondary"
+                    tools:text="www.example.com"/>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Reactions Summary -->
+        <LinearLayout
+            android:id="@+id/reactionsSummary"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="8dp"
+            android:layout_marginBottom="8dp">
+
+            <LinearLayout
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal">
+
+                <ImageView
+                    android:id="@+id/reactionIcon1"
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:src="@drawable/ic_reaction_like"/>
+
+                <ImageView
+                    android:id="@+id/reactionIcon2"
+                    android:layout_width="16dp"
+                    android:layout_height="16dp"
+                    android:layout_marginStart="-4dp"
+                    android:src="@drawable/ic_reaction_love"/>
+            </LinearLayout>
+
+            <TextView
+                android:id="@+id/reactionCountText"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="4dp"
+                android:textSize="12sp"
+                android:textColor="?android:attr/textColorSecondary"
+                tools:text="24 reactions"/>
+        </LinearLayout>
+
+        <!-- Divider -->
+        <View
+            android:layout_width="match_parent"
+            android:layout_height="1dp"
+            android:background="?android:attr/listDivider"/>
+
+        <!-- Reaction Buttons -->
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="horizontal"
+            android:layout_marginTop="8dp">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/likeButton"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1"
+                android:text="Like"
+                android:textColor="?android:attr/textColorSecondary"
+                app:icon="@android:drawable/btn_star"
+                app:iconTint="?android:attr/textColorSecondary"/>
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/reactButton"
+                style="@style/Widget.MaterialComponents.Button.TextButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="😊"
+                android:textSize="18sp"/>
+        </LinearLayout>
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView> 

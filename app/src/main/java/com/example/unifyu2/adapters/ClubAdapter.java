@@ -1,9 +1,11 @@
 package com.example.unifyu2.adapters;
 
+import android.content.Context;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.recyclerview.widget.RecyclerView;
@@ -12,6 +14,7 @@ import com.example.unifyu2.R;
 import com.example.unifyu2.models.Club;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.chip.Chip;
+import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
@@ -19,6 +22,7 @@ import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.database.ValueEventListener;
 
+import java.util.ArrayList;
 import java.util.List;
 
 public class ClubAdapter extends RecyclerView.Adapter<ClubAdapter.ClubViewHolder> {
@@ -66,8 +70,10 @@ public class ClubAdapter extends RecyclerView.Adapter<ClubAdapter.ClubViewHolder
         private TextView descriptionText;
         private TextView memberCountText;
         private MaterialButton joinButton;
+        private MaterialButton exitButton;
         private Chip membershipStatus;
         private DatabaseReference membershipsRef;
+        private DatabaseReference clubsRef;
         private String userId;
         private View adminPanel;
         private MaterialButton manageButton;
@@ -78,6 +84,7 @@ public class ClubAdapter extends RecyclerView.Adapter<ClubAdapter.ClubViewHolder
             descriptionText = itemView.findViewById(R.id.clubDescription);
             memberCountText = itemView.findViewById(R.id.memberCount);
             joinButton = itemView.findViewById(R.id.joinButton);
+            exitButton = itemView.findViewById(R.id.exitButton);
             membershipStatus = itemView.findViewById(R.id.membershipStatus);
             adminPanel = itemView.findViewById(R.id.adminPanel);
             manageButton = itemView.findViewById(R.id.manageButton);
@@ -85,6 +92,7 @@ public class ClubAdapter extends RecyclerView.Adapter<ClubAdapter.ClubViewHolder
             // Initialize Firebase references
             userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
             membershipsRef = FirebaseDatabase.getInstance().getReference("memberships");
+            clubsRef = FirebaseDatabase.getInstance().getReference("clubs");
         }
 
         void bind(Club club, OnClubClickListener listener, String currentUserId) {
@@ -101,10 +109,14 @@ public class ClubAdapter extends RecyclerView.Adapter<ClubAdapter.ClubViewHolder
             
             if (isAdmin) {
                 joinButton.setVisibility(View.GONE);
+                exitButton.setVisibility(View.GONE);
                 manageButton.setOnClickListener(v -> listener.onManageClubClick(club));
             } else {
                 joinButton.setVisibility(View.VISIBLE);
                 joinButton.setOnClickListener(v -> listener.onClubClick(club));
+                
+                // Setup exit button click
+                exitButton.setOnClickListener(v -> showExitConfirmation(club));
             }
         }
 
@@ -113,12 +125,14 @@ public class ClubAdapter extends RecyclerView.Adapter<ClubAdapter.ClubViewHolder
             membershipsRef.child(membershipId).addValueEventListener(new ValueEventListener() {
                 @Override
                 public void onDataChange(@NonNull DataSnapshot snapshot) {
-                    if (snapshot.exists()) {
+                    if (snapshot.exists() && !userId.equals(club.getAdminId())) {
                         joinButton.setVisibility(View.GONE);
                         membershipStatus.setVisibility(View.VISIBLE);
+                        exitButton.setVisibility(View.VISIBLE);
                     } else {
                         joinButton.setVisibility(View.VISIBLE);
                         membershipStatus.setVisibility(View.GONE);
+                        exitButton.setVisibility(View.GONE);
                     }
                 }
 
@@ -127,6 +141,46 @@ public class ClubAdapter extends RecyclerView.Adapter<ClubAdapter.ClubViewHolder
                     // Handle error
                 }
             });
+        }
+
+        private void showExitConfirmation(Club club) {
+            new MaterialAlertDialogBuilder(itemView.getContext())
+                .setTitle("Exit Club")
+                .setMessage("Are you sure you want to exit " + club.getName() + "?")
+                .setPositiveButton("Exit", (dialog, which) -> exitClub(club))
+                .setNegativeButton("Cancel", null)
+                .show();
+        }
+
+        private void exitClub(Club club) {
+            String membershipId = userId + "_" + club.getId();
+            
+            // First remove the membership
+            membershipsRef.child(membershipId).removeValue()
+                .addOnSuccessListener(aVoid -> {
+                    // Then decrement the member count
+                    DatabaseReference memberCountRef = clubsRef.child(club.getId()).child("memberCount");
+                    memberCountRef.get().addOnCompleteListener(task -> {
+                        if (task.isSuccessful()) {
+                            Integer currentCount = task.getResult().getValue(Integer.class);
+                            if (currentCount != null && currentCount > 0) {
+                                memberCountRef.setValue(currentCount - 1)
+                                    .addOnSuccessListener(aVoid2 -> 
+                                        Toast.makeText(itemView.getContext(),
+                                            "Successfully left " + club.getName(),
+                                            Toast.LENGTH_SHORT).show())
+                                    .addOnFailureListener(e -> 
+                                        Toast.makeText(itemView.getContext(),
+                                            "Error updating member count",
+                                            Toast.LENGTH_SHORT).show());
+                            }
+                        }
+                    });
+                })
+                .addOnFailureListener(e -> 
+                    Toast.makeText(itemView.getContext(),
+                        "Error leaving club",
+                        Toast.LENGTH_SHORT).show());
         }
     }
 } 
