@@ -6,6 +6,7 @@ import android.net.Uri;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.MenuItem;
+import android.view.Menu;
 import android.view.View;
 import android.widget.ImageView;
 import android.widget.TextView;
@@ -46,8 +47,13 @@ import java.util.concurrent.atomic.AtomicInteger;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 import androidx.appcompat.app.AlertDialog;
+import androidx.appcompat.app.AppCompatActivity;
+import com.example.unifyu2.adapters.ManageClubMembersAdapter;
+import com.google.firebase.database.*;
+import android.util.Log;
 
-public class ManageClubActivity extends AppCompatActivity {
+public class ManageClubActivity extends AppCompatActivity implements ManageClubMembersAdapter.OnMemberActionListener {
+    private static final String TAG = "ManageClubActivity";
     private Club club;
     private DatabaseReference clubRef;
     private DatabaseReference postsRef;
@@ -58,29 +64,38 @@ public class ManageClubActivity extends AppCompatActivity {
     private Uri selectedImageUri;
     private ActivityResultLauncher<Intent> imagePickerLauncher;
     private View progressBar;
+    private String clubId;
+    private RecyclerView membersRecyclerView;
+    private ManageClubMembersAdapter adapter;
+    private List<User> membersList;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_manage_club);
 
-        // Get club data from intent
+        // Get club from intent
         club = getIntent().getParcelableExtra("club");
         if (club == null) {
-            Toast.makeText(this, "Error loading club data", Toast.LENGTH_SHORT).show();
+            Toast.makeText(this, "Error: Club details not found", Toast.LENGTH_SHORT).show();
+            finish();
+            return;
+        }
+        
+        clubId = club.getId();
+        if (clubId == null) {
+            Toast.makeText(this, "Error: Club ID not found", Toast.LENGTH_SHORT).show();
             finish();
             return;
         }
 
-        // Initialize Firebase refs
-        clubRef = FirebaseDatabase.getInstance().getReference("clubs").child(club.getId());
+        // Initialize Firebase references
+        clubRef = FirebaseDatabase.getInstance().getReference("clubs").child(clubId);
         postsRef = FirebaseDatabase.getInstance().getReference("posts");
         membershipsRef = FirebaseDatabase.getInstance().getReference("memberships");
         usersRef = FirebaseDatabase.getInstance().getReference("users");
         storageRef = FirebaseStorage.getInstance().getReference();
-
-        // Initialize views
-        progressBar = findViewById(R.id.progressBar);
+        membersList = new ArrayList<>();
 
         // Setup toolbar
         setSupportActionBar(findViewById(R.id.toolbar));
@@ -103,43 +118,19 @@ public class ManageClubActivity extends AppCompatActivity {
             });
 
         // Setup RecyclerView
-        RecyclerView postsRecyclerView = findViewById(R.id.postsRecyclerView);
-        postsRecyclerView.setLayoutManager(new LinearLayoutManager(this));
-        postAdapter = new PostAdapter(this, new PostAdapter.OnPostInteractionListener() {
-            @Override
-            public void onLikeClicked(Post post) {
-                // Handle like click
-                // TODO: Implement like functionality
-            }
+        membersRecyclerView = findViewById(R.id.membersRecyclerView);
+        membersRecyclerView.setLayoutManager(new LinearLayoutManager(this));
+        adapter = new ManageClubMembersAdapter(this, membersList, this);
+        membersRecyclerView.setAdapter(adapter);
 
-            @Override
-            public void onReactionSelected(Post post, String reactionType) {
-                // Handle reaction selection
-                // TODO: Implement reaction functionality
-            }
-
-            @Override
-            public void onLinkClicked(String url) {
-                Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
-                startActivity(intent);
-            }
-
-            @Override
-            public void onImageClicked(String imageUrl) {
-                // TODO: Implement full-screen image view
-            }
-        });
-        postsRecyclerView.setAdapter(postAdapter);
-
-        // Setup UI
+        // Setup UI and load members
         setupUI();
-        loadClubPosts();
+        loadMembers();
     }
 
     private void setupUI() {
-        findViewById(R.id.createPostButton).setOnClickListener(v -> showCreatePostDialog());
-        findViewById(R.id.viewMembersButton).setOnClickListener(v -> showMembersDialog());
-        findViewById(R.id.editClubButton).setOnClickListener(v -> showEditClubDialog());
+        // No buttons to setup in the new layout
+        loadMembers();
     }
 
     private void showCreatePostDialog() {
@@ -362,42 +353,115 @@ public class ManageClubActivity extends AppCompatActivity {
             );
     }
 
-    private void loadClubPosts() {
-        postsRef.orderByChild("userId").equalTo(FirebaseAuth.getInstance().getCurrentUser().getUid())
-            .addListenerForSingleValueEvent(new ValueEventListener() {
-                @Override
-                public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
-                    List<Post> posts = new ArrayList<>();
-                    for (DataSnapshot snapshot : dataSnapshot.getChildren()) {
-                        Post post = snapshot.getValue(Post.class);
-                        if (post != null) {
-                            post.setPostId(snapshot.getKey());
-                            posts.add(post);
-                        }
+    private void loadMembers() {
+        DatabaseReference membershipsRef = FirebaseDatabase.getInstance().getReference("memberships");
+        Query clubMembershipsQuery = membershipsRef.orderByChild("clubId").equalTo(clubId);
+        
+        clubMembershipsQuery.addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                membersList.clear();
+                for (DataSnapshot membershipSnapshot : snapshot.getChildren()) {
+                    String userId = membershipSnapshot.child("userId").getValue(String.class);
+                    if (userId != null) {
+                        loadMemberDetails(userId);
                     }
-
-                    // Sort posts by timestamp (newest first)
-                    Collections.sort(posts, (p1, p2) -> {
-                        Long timestamp1 = (Long) p1.getTimestamp();
-                        Long timestamp2 = (Long) p2.getTimestamp();
-                        return timestamp2.compareTo(timestamp1);
-                    });
-
-                    postAdapter.setPosts(posts);
                 }
+            }
 
-                @Override
-                public void onCancelled(@NonNull DatabaseError databaseError) {
-                    Toast.makeText(ManageClubActivity.this,
-                        "Error loading posts", Toast.LENGTH_SHORT).show();
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                Log.e(TAG, "Error loading memberships: " + error.getMessage());
+                Toast.makeText(ManageClubActivity.this, "Error loading members", Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private void loadMemberDetails(String userId) {
+        DatabaseReference userRef = FirebaseDatabase.getInstance().getReference("users").child(userId);
+        userRef.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                if (snapshot.exists()) {
+                    User user = new User();
+                    user.setId(snapshot.getKey());
+                    user.setUsername(snapshot.child("username").getValue(String.class));
+                    user.setEmail(snapshot.child("email").getValue(String.class));
+                    
+                    membersList.add(user);
+                    adapter.notifyDataSetChanged();
                 }
-            });
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                Log.e(TAG, "Error loading user details: " + error.getMessage());
+            }
+        });
+    }
+
+    @Override
+    public void onMakeAdmin(User member) {
+        new AlertDialog.Builder(this)
+            .setTitle("Make Admin")
+            .setMessage("Are you sure you want to make " + member.getUsername() + " the admin? You will lose your admin privileges.")
+            .setPositiveButton("Yes", (dialog, which) -> {
+                clubRef.child("adminId").setValue(member.getId())
+                    .addOnSuccessListener(aVoid -> {
+                        Toast.makeText(this, "Admin rights transferred successfully", Toast.LENGTH_SHORT).show();
+                        finish(); // Close activity since current user is no longer admin
+                    })
+                    .addOnFailureListener(e -> Toast.makeText(this, "Failed to transfer admin rights", Toast.LENGTH_SHORT).show());
+            })
+            .setNegativeButton("No", null)
+            .show();
+    }
+
+    @Override
+    public void onRemoveMember(User member) {
+        new AlertDialog.Builder(this)
+            .setTitle("Remove Member")
+            .setMessage("Are you sure you want to remove " + member.getUsername() + " from the club?")
+            .setPositiveButton("Yes", (dialog, which) -> {
+                String membershipKey = member.getId() + "_" + clubId;
+                DatabaseReference membershipRef = FirebaseDatabase.getInstance()
+                    .getReference("memberships")
+                    .child(membershipKey);
+                
+                membershipRef.removeValue()
+                    .addOnSuccessListener(aVoid -> {
+                        Toast.makeText(this, "Member removed successfully", Toast.LENGTH_SHORT).show();
+                        // Update member count
+                        clubRef.child("memberCount").get().addOnSuccessListener(dataSnapshot -> {
+                            if (dataSnapshot.exists()) {
+                                int currentCount = dataSnapshot.getValue(Integer.class);
+                                clubRef.child("memberCount").setValue(currentCount - 1);
+                            }
+                        });
+                    })
+                    .addOnFailureListener(e -> Toast.makeText(this, "Failed to remove member", Toast.LENGTH_SHORT).show());
+            })
+            .setNegativeButton("No", null)
+            .show();
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.manage_club_menu, menu);
+        return true;
     }
 
     @Override
     public boolean onOptionsItemSelected(MenuItem item) {
-        if (item.getItemId() == android.R.id.home) {
+        int itemId = item.getItemId();
+        if (itemId == android.R.id.home) {
             onBackPressed();
+            return true;
+        } else if (itemId == R.id.action_create_post) {
+            showCreatePostDialog();
+            return true;
+        } else if (itemId == R.id.action_edit_club) {
+            showEditClubDialog();
             return true;
         }
         return super.onOptionsItemSelected(item);
