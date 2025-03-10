@@ -84,7 +84,7 @@ public class ClubFeedFragment extends Fragment implements PostAdapter.OnPostInte
             emptyStateContainer = view.findViewById(R.id.emptyStateContainer);
         emptyView = view.findViewById(R.id.emptyView);
         progressBar = view.findViewById(R.id.progressBar);
-        createPostFab = view.findViewById(R.id.createPostFab);
+        //createPostFab = view.findViewById(R.id.createPostFab);
 
             // Initialize RecyclerView
             recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
@@ -95,7 +95,7 @@ public class ClubFeedFragment extends Fragment implements PostAdapter.OnPostInte
             swipeRefreshLayout.setOnRefreshListener(this::loadPosts);
 
         // Setup FAB
-        createPostFab.setOnClickListener(v -> showCreatePostDialog());
+       // createPostFab.setOnClickListener(v -> showCreatePostDialog());
 
         // Load initial data
             if (clubIds.isEmpty()) {
