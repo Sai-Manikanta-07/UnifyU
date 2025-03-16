@@ -1,0 +1,56 @@
+{
+  "rules": {
+    ".read": "auth != null",
+    "users": {
+      "$uid": {
+        ".read": "auth != null",
+        ".write": "$uid === auth.uid",
+        ".validate": "newData.hasChild('username') && (!newData.child('rollNumber').exists() || newData.child('rollNumber').isString()) && (!newData.child('semester').exists() || newData.child('semester').isString())"
+      }
+    },
+    "clubs": {
+      ".read": "auth != null",
+      "$clubId": {
+        ".read": "auth != null",
+        ".write": "auth != null && ((!data.exists() || data.child('adminId').val() === auth.uid) || (auth != null && !newData.parent().parent().child('clubs').child($clubId).exists()))",
+        "members": {
+          ".write": "auth != null",
+          "$memberId": {
+            ".write": "auth != null && $memberId === auth.uid",
+            ".validate": "newData.isBoolean()"
+          }
+        },
+        "memberCount": {
+          ".write": "auth != null"
+        },
+        "adminId": {
+          ".validate": "newData.isString() && newData.val().length > 0"
+        }
+      }
+    },
+    "memberships": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "posts": {
+      ".read": "auth != null",
+      "$postId": {
+        ".write": "auth != null && (!data.exists() || data.child('userId').val() === auth.uid || root.child('clubs').child(data.child('clubId').val()).child('adminId').val() === auth.uid)",
+        ".validate": "newData.hasChildren(['userId', 'content', 'clubId'])"
+      }
+    },
+    "events": {
+      ".read": "auth != null",
+      "$eventId": {
+        ".write": "auth != null && (!data.exists() || data.child('adminId').val() === auth.uid)",
+        ".validate": "newData.hasChildren(['clubId', 'title', 'description', 'venue', 'date', 'maxParticipants'])",
+        "registeredUsers": {
+          "$userId": {
+            ".write": "auth != null && $userId === auth.uid",
+            ".validate": "newData.isString() || !newData.exists()"
+          }
+        }
+      }
+    }
+  }
+} 

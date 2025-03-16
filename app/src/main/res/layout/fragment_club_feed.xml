@@ -16,15 +16,22 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent">
 
-            <androidx.recyclerview.widget.RecyclerView
-                android:id="@+id/recyclerView"
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="match_parent"
-                android:clipToPadding="false"
-                android:paddingTop="8dp"
-                android:paddingBottom="80dp"
-                android:scrollbars="vertical"
-                android:scrollbarStyle="outsideOverlay" />
+                android:orientation="vertical">
+
+                <!-- Posts Section -->
+                <androidx.recyclerview.widget.RecyclerView
+                    android:id="@+id/recyclerView"
+                    android:layout_width="match_parent"
+                    android:layout_height="match_parent"
+                    android:clipToPadding="false"
+                    android:paddingTop="8dp"
+                    android:paddingBottom="80dp"
+                    android:scrollbars="vertical"
+                    android:scrollbarStyle="outsideOverlay" />
+            </LinearLayout>
 
             <LinearLayout
                 android:id="@+id/emptyStateContainer"
@@ -76,7 +83,5 @@
         </FrameLayout>
 
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
-
-
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout> 

@@ -25,6 +25,7 @@ import com.google.firebase.database.ValueEventListener;
 import com.example.unifyu2.fragments.ClubFeedFragment;
 import com.example.unifyu2.fragments.ViewClubsFragment;
 import com.example.unifyu2.fragments.ProfileFragment;
+import com.example.unifyu2.fragments.EventsFragment;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -64,6 +65,9 @@ public class MainActivity extends AppCompatActivity {
                 return true;
             } else if (itemId == R.id.navigation_clubs) {
                 loadFragment(new ViewClubsFragment());
+                return true;
+            } else if (itemId == R.id.navigation_events) {
+                loadFragment(new EventsFragment());
                 return true;
             } else if (itemId == R.id.navigation_profile) {
                 loadFragment(new ProfileFragment());

@@ -39,7 +39,8 @@
         <item name="android:textSize">16sp</item>
     </style>
 
-    <style name="CircleImageView" parent="">
+    <!-- Circular Image View Style -->
+    <style name="CircleImageView">
         <item name="cornerFamily">rounded</item>
         <item name="cornerSize">50%</item>
     </style>

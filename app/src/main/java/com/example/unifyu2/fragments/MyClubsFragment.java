@@ -7,133 +7,132 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.TextView;
 import android.widget.Toast;
+import android.util.Log;
+
+import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
+
 import com.example.unifyu2.ManageClubActivity;
 import com.example.unifyu2.R;
 import com.example.unifyu2.adapters.ClubAdapter;
 import com.example.unifyu2.models.Club;
 import com.example.unifyu2.models.ClubMembership;
+import com.google.android.material.progressindicator.CircularProgressIndicator;
 import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.database.*;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
+
 import java.util.ArrayList;
 import java.util.List;
 
 public class MyClubsFragment extends Fragment implements ClubAdapter.OnClubClickListener {
+    private static final String TAG = "MyClubsFragment";
+    
     private RecyclerView recyclerView;
-    private TextView emptyView;
-    private View progressBar;
+    private TextView noClubsText;
+    private CircularProgressIndicator progressBar;
     private ClubAdapter adapter;
-    private DatabaseReference clubsRef;
-    private DatabaseReference membershipsRef;
+    private List<Club> clubList;
     
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         View view = inflater.inflate(R.layout.fragment_my_clubs, container, false);
         
-        recyclerView = view.findViewById(R.id.recyclerView);
-        emptyView = view.findViewById(R.id.emptyView);
+        recyclerView = view.findViewById(R.id.clubsRecyclerView);
+        noClubsText = view.findViewById(R.id.noClubsText);
         progressBar = view.findViewById(R.id.progressBar);
         
-        clubsRef = FirebaseDatabase.getInstance().getReference("clubs");
-        membershipsRef = FirebaseDatabase.getInstance().getReference("memberships");
+        clubList = new ArrayList<>();
+        String currentUserId = FirebaseAuth.getInstance().getCurrentUser().getUid();
+        adapter = new ClubAdapter(clubList, this, currentUserId);
         
         recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
-        adapter = new ClubAdapter(new ArrayList<>(), this, 
-            FirebaseAuth.getInstance().getCurrentUser().getUid());
         recyclerView.setAdapter(adapter);
         
-        loadClubs();
+        loadMyClubs();
         
         return view;
     }
-
-    private void showEmpty() {
-        if (isAdded() && getView() != null) {
-            progressBar.setVisibility(View.GONE);
-            recyclerView.setVisibility(View.GONE);
-            emptyView.setVisibility(View.VISIBLE);
-        }
-    }
-
-    private void loadClubs() {
-        progressBar.setVisibility(View.VISIBLE);
-        recyclerView.setVisibility(View.GONE);
-        emptyView.setVisibility(View.GONE);
-
+    
+    private void loadMyClubs() {
+        if (!isAdded() || getContext() == null) return;
+        
         String userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
-
-        // First get all memberships for this user
-        membershipsRef.orderByChild("userId").equalTo(userId)
-            .addValueEventListener(new ValueEventListener() {
-                @Override
-                public void onDataChange(DataSnapshot membershipsSnapshot) {
-                    if (!isAdded()) return;
-                    
-                    List<String> clubIds = new ArrayList<>();
-                    
-                    for (DataSnapshot membershipSnapshot : membershipsSnapshot.getChildren()) {
-                        String clubId = membershipSnapshot.child("clubId").getValue(String.class);
-                        if (clubId != null) {
-                            clubIds.add(clubId);
-                        }
+        progressBar.setVisibility(View.VISIBLE);
+        
+        // First get all club memberships for this user
+        DatabaseReference membershipRef = FirebaseDatabase.getInstance().getReference("club_memberships");
+        membershipRef.orderByChild("userId").equalTo(userId).addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                if (!isAdded() || getContext() == null) return;
+                
+                List<String> clubIds = new ArrayList<>();
+                for (DataSnapshot membershipSnapshot : snapshot.getChildren()) {
+                    ClubMembership membership = membershipSnapshot.getValue(ClubMembership.class);
+                    if (membership != null) {
+                        clubIds.add(membership.getClubId());
                     }
-
-                    if (clubIds.isEmpty()) {
-                        showEmpty();
-                        return;
-                    }
-
-                    // Now get all clubs that user is member of
-                    clubsRef.addListenerForSingleValueEvent(new ValueEventListener() {
-                        @Override
-                        public void onDataChange(DataSnapshot clubsSnapshot) {
-                            if (!isAdded()) return;
-                            
-                            List<Club> userClubs = new ArrayList<>();
-                            
-                            for (String clubId : clubIds) {
-                                DataSnapshot clubSnapshot = clubsSnapshot.child(clubId);
-                                if (clubSnapshot.exists()) {
-                                    Club club = clubSnapshot.getValue(Club.class);
-                                    if (club != null) {
-                                        club.setId(clubId);
-                                        userClubs.add(club);
-                                    }
-                                }
-                            }
-
-                            if (userClubs.isEmpty()) {
-                                showEmpty();
-                            } else {
-                                progressBar.setVisibility(View.GONE);
-                                recyclerView.setVisibility(View.VISIBLE);
-                                emptyView.setVisibility(View.GONE);
-                                adapter.updateClubs(userClubs);
-                            }
-                        }
-
-                        @Override
-                        public void onCancelled(DatabaseError error) {
-                            if (!isAdded()) return;
-                            showEmpty();
-                            Toast.makeText(getContext(), 
-                                "Error loading clubs: " + error.getMessage(), 
-                                Toast.LENGTH_SHORT).show();
-                        }
-                    });
                 }
-
+                
+                if (clubIds.isEmpty()) {
+                    noClubsText.setVisibility(View.VISIBLE);
+                    recyclerView.setVisibility(View.GONE);
+                    progressBar.setVisibility(View.GONE);
+                    return;
+                }
+                
+                // Now fetch the club details for each club ID
+                loadClubDetails(clubIds);
+            }
+            
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                if (!isAdded() || getContext() == null) return;
+                Log.e(TAG, "Database error: ", error.toException());
+                Toast.makeText(getContext(), "Failed to load clubs", Toast.LENGTH_SHORT).show();
+                progressBar.setVisibility(View.GONE);
+            }
+        });
+    }
+    
+    private void loadClubDetails(List<String> clubIds) {
+        clubList.clear();
+        DatabaseReference clubsRef = FirebaseDatabase.getInstance().getReference("clubs");
+        
+        for (String clubId : clubIds) {
+            clubsRef.child(clubId).addListenerForSingleValueEvent(new ValueEventListener() {
                 @Override
-                public void onCancelled(DatabaseError error) {
-                    if (!isAdded()) return;
-                    showEmpty();
-                    Toast.makeText(getContext(), 
-                        "Error loading memberships: " + error.getMessage(), 
-                        Toast.LENGTH_SHORT).show();
+                public void onDataChange(@NonNull DataSnapshot snapshot) {
+                    if (!isAdded() || getContext() == null) return;
+                    
+                    Club club = snapshot.getValue(Club.class);
+                    if (club != null) {
+                        clubList.add(club);
+                        adapter.notifyDataSetChanged();
+                        
+                        noClubsText.setVisibility(View.GONE);
+                        recyclerView.setVisibility(View.VISIBLE);
+                    }
+                    
+                    if (clubList.size() == clubIds.size()) {
+                        progressBar.setVisibility(View.GONE);
+                    }
+                }
+                
+                @Override
+                public void onCancelled(@NonNull DatabaseError error) {
+                    if (!isAdded() || getContext() == null) return;
+                    Log.e(TAG, "Database error: ", error.toException());
+                    progressBar.setVisibility(View.GONE);
                 }
             });
+        }
     }
 
     @Override

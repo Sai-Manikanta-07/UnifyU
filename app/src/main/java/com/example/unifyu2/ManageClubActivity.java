@@ -1,6 +1,8 @@
 package com.example.unifyu2;
 
 import android.app.Activity;
+import android.app.DatePickerDialog;
+import android.app.TimePickerDialog;
 import android.content.Intent;
 import android.net.Uri;
 import android.os.Bundle;
@@ -8,8 +10,11 @@ import android.view.LayoutInflater;
 import android.view.MenuItem;
 import android.view.Menu;
 import android.view.View;
+import android.widget.Button;
+import android.widget.DatePicker;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.TimePicker;
 import android.widget.Toast;
 
 import androidx.activity.result.ActivityResultLauncher;
@@ -25,6 +30,8 @@ import com.example.unifyu2.models.Club;
 import com.example.unifyu2.models.Post;
 import com.example.unifyu2.models.ClubMembership;
 import com.example.unifyu2.models.User;
+import com.example.unifyu2.models.Event;
+import com.google.android.material.button.MaterialButton;
 import com.google.android.material.dialog.MaterialAlertDialogBuilder;
 import com.google.android.material.textfield.TextInputEditText;
 import com.google.firebase.auth.FirebaseAuth;
@@ -36,10 +43,15 @@ import com.google.firebase.database.ValueEventListener;
 import com.google.firebase.storage.FirebaseStorage;
 import com.google.firebase.storage.StorageReference;
 
+import java.text.ParseException;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Calendar;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -457,13 +469,169 @@ public class ManageClubActivity extends AppCompatActivity implements ManageClubM
         if (itemId == android.R.id.home) {
             onBackPressed();
             return true;
+        } else if (itemId == R.id.action_view_events) {
+            // Launch ClubEventsActivity
+            Intent intent = new Intent(this, ClubEventsActivity.class);
+            intent.putExtra("clubId", clubId);
+            startActivity(intent);
+            return true;
         } else if (itemId == R.id.action_create_post) {
             showCreatePostDialog();
+            return true;
+        } else if (itemId == R.id.action_create_event) {
+            showCreateEventDialog();
             return true;
         } else if (itemId == R.id.action_edit_club) {
             showEditClubDialog();
             return true;
         }
         return super.onOptionsItemSelected(item);
+    }
+
+    private void showCreateEventDialog() {
+        View dialogView = LayoutInflater.from(this).inflate(R.layout.dialog_create_event, null);
+        AlertDialog dialog = new MaterialAlertDialogBuilder(this)
+            .setTitle("Create Event")
+            .setView(dialogView)
+            .setPositiveButton("Create", null)
+            .setNegativeButton("Cancel", null)
+            .create();
+
+        TextInputEditText titleInput = dialogView.findViewById(R.id.eventTitleInput);
+        TextInputEditText descriptionInput = dialogView.findViewById(R.id.eventDescriptionInput);
+        TextInputEditText venueInput = dialogView.findViewById(R.id.eventVenueInput);
+        TextInputEditText dateInput = dialogView.findViewById(R.id.eventDateInput);
+        TextInputEditText timeInput = dialogView.findViewById(R.id.eventTimeInput);
+        TextInputEditText maxParticipantsInput = dialogView.findViewById(R.id.maxParticipantsInput);
+        ImageView imagePreview = dialogView.findViewById(R.id.eventImagePreview);
+        MaterialButton uploadButton = dialogView.findViewById(R.id.uploadImageButton);
+
+        // Setup date picker
+        dateInput.setOnClickListener(v -> {
+            Calendar calendar = Calendar.getInstance();
+            new DatePickerDialog(this, (view, year, month, day) -> {
+                calendar.set(year, month, day);
+                dateInput.setText(String.format(Locale.getDefault(), "%02d/%02d/%d", day, month + 1, year));
+            }, calendar.get(Calendar.YEAR), calendar.get(Calendar.MONTH), 
+               calendar.get(Calendar.DAY_OF_MONTH)).show();
+        });
+
+        // Setup time picker
+        timeInput.setOnClickListener(v -> {
+            Calendar calendar = Calendar.getInstance();
+            new TimePickerDialog(this, (view, hour, minute) -> {
+                timeInput.setText(String.format(Locale.getDefault(), "%02d:%02d", hour, minute));
+            }, calendar.get(Calendar.HOUR_OF_DAY), calendar.get(Calendar.MINUTE), true).show();
+        });
+
+        // Setup image upload
+        uploadButton.setOnClickListener(v -> {
+            Intent intent = new Intent(Intent.ACTION_GET_CONTENT);
+            intent.setType("image/*");
+            imagePickerLauncher.launch(intent);
+        });
+
+        dialog.setOnShowListener(dialogInterface -> {
+            Button button = dialog.getButton(AlertDialog.BUTTON_POSITIVE);
+            button.setOnClickListener(view -> {
+                String title = titleInput.getText().toString().trim();
+                String description = descriptionInput.getText().toString().trim();
+                String venue = venueInput.getText().toString().trim();
+                String date = dateInput.getText().toString().trim();
+                String time = timeInput.getText().toString().trim();
+                String maxParticipantsStr = maxParticipantsInput.getText().toString().trim();
+
+                if (title.isEmpty() || description.isEmpty() || venue.isEmpty() || 
+                    date.isEmpty() || time.isEmpty() || maxParticipantsStr.isEmpty()) {
+                    Toast.makeText(this, "Please fill all fields", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
+                int maxParticipants;
+                try {
+                    maxParticipants = Integer.parseInt(maxParticipantsStr);
+                } catch (NumberFormatException e) {
+                    Toast.makeText(this, "Invalid number for maximum participants", 
+                        Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
+                // Parse date and time
+                SimpleDateFormat sdf = new SimpleDateFormat("dd/MM/yyyy HH:mm", Locale.getDefault());
+                Date eventDate;
+                try {
+                    eventDate = sdf.parse(date + " " + time);
+                } catch (ParseException e) {
+                    Toast.makeText(this, "Invalid date or time format", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
+                if (eventDate != null && eventDate.before(new Date())) {
+                    Toast.makeText(this, "Event date must be in the future", Toast.LENGTH_SHORT).show();
+                    return;
+                }
+
+                createEvent(title, description, venue, eventDate.getTime(), maxParticipants, dialog);
+            });
+        });
+
+        dialog.show();
+    }
+
+    private void createEvent(String title, String description, String venue, long date, 
+                           int maxParticipants, AlertDialog dialog) {
+        Log.d(TAG, "Creating event with title: " + title);
+        DatabaseReference eventsRef = FirebaseDatabase.getInstance().getReference("events");
+        String eventId = eventsRef.push().getKey();
+        
+        if (eventId == null) {
+            Log.e(TAG, "Failed to generate event ID");
+            Toast.makeText(this, "Error creating event", Toast.LENGTH_SHORT).show();
+            return;
+        }
+
+        Log.d(TAG, "Generated event ID: " + eventId);
+        Event event = new Event(eventId, clubId, title, description, venue, date, maxParticipants);
+        Log.d(TAG, "Created event object with clubId: " + clubId);
+
+        if (selectedImageUri != null) {
+            Log.d(TAG, "Uploading event image");
+            StorageReference eventImageRef = storageRef.child("event_images/" + eventId);
+            eventImageRef.putFile(selectedImageUri)
+                .addOnSuccessListener(taskSnapshot -> {
+                    Log.d(TAG, "Image upload successful");
+                    eventImageRef.getDownloadUrl().addOnSuccessListener(uri -> {
+                        event.setImageUrl(uri.toString());
+                        Log.d(TAG, "Got image URL: " + uri.toString());
+                        saveEventToDatabase(event, dialog);
+                    });
+                })
+                .addOnFailureListener(e -> {
+                    Log.e(TAG, "Failed to upload image: " + e.getMessage());
+                    Toast.makeText(this, "Failed to upload image: " + e.getMessage(), 
+                        Toast.LENGTH_SHORT).show();
+                    saveEventToDatabase(event, dialog);
+                });
+        } else {
+            Log.d(TAG, "No image selected, saving event directly");
+            saveEventToDatabase(event, dialog);
+        }
+    }
+
+    private void saveEventToDatabase(Event event, AlertDialog dialog) {
+        Log.d(TAG, "Saving event to database with ID: " + event.getEventId());
+        DatabaseReference eventsRef = FirebaseDatabase.getInstance().getReference("events");
+        eventsRef.child(event.getEventId()).setValue(event)
+            .addOnSuccessListener(aVoid -> {
+                Log.d(TAG, "Event saved successfully");
+                Toast.makeText(this, "Event created successfully", Toast.LENGTH_SHORT).show();
+                dialog.dismiss();
+                selectedImageUri = null;
+            })
+            .addOnFailureListener(e -> {
+                Log.e(TAG, "Failed to save event: " + e.getMessage());
+                Toast.makeText(this, "Failed to create event: " + e.getMessage(), 
+                    Toast.LENGTH_SHORT).show();
+            });
     }
 } 
