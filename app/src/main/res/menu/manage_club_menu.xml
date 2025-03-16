@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="utf-8"?>
+<menu xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto">
+    
+    <item
+        android:id="@+id/action_create_post"
+        android:title="Create Post"
+        android:icon="@drawable/ic_add"
+        app:showAsAction="ifRoom"/>
+
+    <item
+        android:id="@+id/action_create_event"
+        android:title="Create Event"
+        android:icon="@drawable/ic_event"
+        app:showAsAction="ifRoom"/>
+
+    <item
+        android:id="@+id/action_edit_club"
+        android:title="Edit Club Details"
+        android:icon="@drawable/ic_edit"
+        app:showAsAction="ifRoom"/>
+</menu> 

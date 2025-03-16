@@ -68,6 +68,16 @@
             android:name=".UserDetailsActivity"
             android:exported="false"/>
         
+        <activity
+            android:name=".ClubEventsActivity"
+            android:exported="false"
+            android:label="Club Events" />
+        
+        <activity
+            android:name=".AllEventsActivity"
+            android:exported="false"
+            android:label="All Events" />
+        
         <service
             android:name=".services.UnifyUMessagingService"
             android:exported="false">

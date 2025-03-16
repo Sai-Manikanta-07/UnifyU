@@ -1,0 +1,45 @@
+{
+  "rules": {
+    "users": {
+      "$uid": {
+        ".read": "auth != null",
+        ".write": "auth != null && auth.uid == $uid",
+        "clubs": {
+          "$clubId": {
+            ".write": "auth != null && 
+                      (auth.uid == $uid || 
+                       root.child('clubs').child($clubId).child('adminId').val() == auth.uid)"
+          }
+        },
+        ".validate": "newData.hasChild('username') && 
+                     (!newData.child('rollNumber').exists() || newData.child('rollNumber').isString()) &&
+                     (!newData.child('semester').exists() || newData.child('semester').isString())"
+      }
+    },
+    "clubs": {
+      ".read": "auth != null",
+      "$clubId": {
+        ".write": "auth != null",
+        "members": {
+          ".write": "auth != null && 
+                    (root.child('clubs').child($clubId).child('adminId').val() == auth.uid ||
+                     auth.uid == root.child('clubs').child($clubId).child('adminId').val())",
+          "$memberId": {
+            ".validate": "newData.isBoolean() || !newData.exists()"
+          }
+        },
+        "adminId": {
+          ".validate": "newData.isString() && newData.val().length > 0"
+        }
+      }
+    },
+    "memberships": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    },
+    "posts": {
+      ".read": "auth != null",
+      ".write": "auth != null"
+    }
+  }
+} 

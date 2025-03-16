@@ -1,7 +1,5 @@
 package com.example.unifyu2.fragments;
 
-import android.content.Intent;
-import android.net.Uri;
 import android.os.Bundle;
 import android.view.LayoutInflater;
 import android.view.View;
@@ -9,88 +7,93 @@ import android.view.ViewGroup;
 import android.widget.TextView;
 import android.widget.Toast;
 import android.util.Log;
+
 import androidx.annotation.NonNull;
 import androidx.fragment.app.Fragment;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 import androidx.swiperefreshlayout.widget.SwipeRefreshLayout;
+
 import com.example.unifyu2.R;
-import com.example.unifyu2.adapters.PostAdapter;
-import com.example.unifyu2.models.Post;
+import com.example.unifyu2.adapters.EventAdapter;
+import com.example.unifyu2.models.Event;
 import com.google.android.material.progressindicator.CircularProgressIndicator;
 import com.google.firebase.auth.FirebaseAuth;
-import com.google.firebase.database.*;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
+
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.List;
 
-public class MyPostsFragment extends Fragment implements PostAdapter.OnPostInteractionListener {
-    private static final String TAG = "MyPostsFragment";
+public class MyEventsFragment extends Fragment {
+    private static final String TAG = "MyEventsFragment";
     
     private RecyclerView recyclerView;
-    private TextView noPostsText;
+    private TextView noEventsText;
     private CircularProgressIndicator progressBar;
-    private PostAdapter adapter;
-    private List<Post> postList;
+    private EventAdapter adapter;
+    private List<Event> eventList;
     private SwipeRefreshLayout swipeRefreshLayout;
     
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
-        View view = inflater.inflate(R.layout.fragment_my_posts, container, false);
+        View view = inflater.inflate(R.layout.fragment_my_events, container, false);
         
-        recyclerView = view.findViewById(R.id.postsRecyclerView);
-        noPostsText = view.findViewById(R.id.noPostsText);
+        recyclerView = view.findViewById(R.id.eventsRecyclerView);
+        noEventsText = view.findViewById(R.id.noEventsText);
         progressBar = view.findViewById(R.id.progressBar);
         swipeRefreshLayout = view.findViewById(R.id.swipeRefreshLayout);
         
-        postList = new ArrayList<>();
-        adapter = new PostAdapter(getContext(), this);
+        eventList = new ArrayList<>();
+        adapter = new EventAdapter(getContext(), eventList);
         
         recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
         recyclerView.setAdapter(adapter);
         
-        swipeRefreshLayout.setOnRefreshListener(this::loadMyPosts);
+        swipeRefreshLayout.setOnRefreshListener(this::loadMyEvents);
         
-        loadMyPosts();
+        loadMyEvents();
         
         return view;
     }
     
-    private void loadMyPosts() {
+    private void loadMyEvents() {
         if (!isAdded() || getContext() == null) return;
         
         String userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
         progressBar.setVisibility(View.VISIBLE);
         
-        DatabaseReference postsRef = FirebaseDatabase.getInstance().getReference("posts");
-        Query query = postsRef.orderByChild("userId").equalTo(userId);
+        DatabaseReference eventsRef = FirebaseDatabase.getInstance().getReference("events");
         
-        query.addValueEventListener(new ValueEventListener() {
+        eventsRef.addValueEventListener(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
                 if (!isAdded() || getContext() == null) return;
                 
-                postList.clear();
-                for (DataSnapshot postSnapshot : snapshot.getChildren()) {
-                    Post post = postSnapshot.getValue(Post.class);
-                    if (post != null) {
-                        post.setPostId(postSnapshot.getKey());
-                        postList.add(post);
+                eventList.clear();
+                for (DataSnapshot eventSnapshot : snapshot.getChildren()) {
+                    Event event = eventSnapshot.getValue(Event.class);
+                    if (event != null && event.isRegistered(userId)) {
+                        event.setEventId(eventSnapshot.getKey());
+                        eventList.add(event);
                     }
                 }
                 
-                // Sort posts by timestamp (newest first)
-                Collections.sort(postList, (p1, p2) -> 
-                    Long.compare(p2.getTimestampLong(), p1.getTimestampLong()));
+                // Sort events by date (upcoming first)
+                Collections.sort(eventList, Comparator.comparing(Event::getDate));
                 
-                adapter.setPosts(postList);
                 adapter.notifyDataSetChanged();
                 
-                if (postList.isEmpty()) {
-                    noPostsText.setVisibility(View.VISIBLE);
+                if (eventList.isEmpty()) {
+                    noEventsText.setVisibility(View.VISIBLE);
                     recyclerView.setVisibility(View.GONE);
                 } else {
-                    noPostsText.setVisibility(View.GONE);
+                    noEventsText.setVisibility(View.GONE);
                     recyclerView.setVisibility(View.VISIBLE);
                 }
                 
@@ -102,33 +105,10 @@ public class MyPostsFragment extends Fragment implements PostAdapter.OnPostInter
             public void onCancelled(@NonNull DatabaseError error) {
                 if (!isAdded() || getContext() == null) return;
                 Log.e(TAG, "Database error: ", error.toException());
-                Toast.makeText(getContext(), "Failed to load posts", Toast.LENGTH_SHORT).show();
+                Toast.makeText(getContext(), "Failed to load events", Toast.LENGTH_SHORT).show();
                 progressBar.setVisibility(View.GONE);
                 swipeRefreshLayout.setRefreshing(false);
             }
         });
-    }
-
-    @Override
-    public void onLikeClicked(Post post) {
-        // Handle like click
-        // TODO: Implement like functionality
-    }
-
-    @Override
-    public void onReactionSelected(Post post, String reactionType) {
-        // Handle reaction selection
-        // TODO: Implement reaction functionality
-    }
-
-    @Override
-    public void onLinkClicked(String url) {
-        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
-        startActivity(intent);
-    }
-
-    @Override
-    public void onImageClicked(String imageUrl) {
-        // TODO: Implement full-screen image view
     }
 } 

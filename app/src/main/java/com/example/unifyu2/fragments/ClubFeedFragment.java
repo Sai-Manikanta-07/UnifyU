@@ -25,10 +25,12 @@ import com.google.firebase.database.DataSnapshot;
 import com.google.firebase.database.DatabaseError;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.Query;
 import com.google.firebase.database.ValueEventListener;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
@@ -67,7 +69,7 @@ public class ClubFeedFragment extends Fragment implements PostAdapter.OnPostInte
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container, Bundle savedInstanceState) {
         try {
-        View view = inflater.inflate(R.layout.fragment_club_feed, container, false);
+            View view = inflater.inflate(R.layout.fragment_club_feed, container, false);
 
             // Initialize Firebase
             firebaseAuth = FirebaseAuth.getInstance();
@@ -78,41 +80,33 @@ public class ClubFeedFragment extends Fragment implements PostAdapter.OnPostInte
             Log.d(TAG, "Posts Reference: " + postsRef.toString());
             Log.d(TAG, "Club IDs at fragment creation: " + clubIds);
 
-        // Initialize views
+            // Initialize views
             recyclerView = view.findViewById(R.id.recyclerView);
             swipeRefreshLayout = view.findViewById(R.id.swipeRefreshLayout);
             emptyStateContainer = view.findViewById(R.id.emptyStateContainer);
-        emptyView = view.findViewById(R.id.emptyView);
-        progressBar = view.findViewById(R.id.progressBar);
-        //createPostFab = view.findViewById(R.id.createPostFab);
+            emptyView = view.findViewById(R.id.emptyView);
+            progressBar = view.findViewById(R.id.progressBar);
+            //createPostFab = view.findViewById(R.id.createPostFab);
 
-            // Initialize RecyclerView
+            // Initialize RecyclerView for posts
             recyclerView.setLayoutManager(new LinearLayoutManager(getContext()));
             adapter = new PostAdapter(requireContext(), this);
             recyclerView.setAdapter(adapter);
 
-        // Setup SwipeRefreshLayout
+            // Setup SwipeRefreshLayout
             swipeRefreshLayout.setOnRefreshListener(this::loadPosts);
 
-        // Setup FAB
-       // createPostFab.setOnClickListener(v -> showCreatePostDialog());
+            // Setup FAB
+            // createPostFab.setOnClickListener(v -> showCreatePostDialog());
 
-        // Load initial data
-            if (clubIds.isEmpty()) {
-                Log.d(TAG, "No club IDs available, showing empty view");
-                showEmptyView();
-                Toast.makeText(getContext(), "No clubs joined yet", Toast.LENGTH_SHORT).show();
-            } else {
-                Log.d(TAG, "Loading posts for " + clubIds.size() + " clubs");
-                loadPosts();
-            }
+            // Load initial data
+            loadPosts();
 
-        return view;
+            return view;
         } catch (Exception e) {
             Log.e(TAG, "Error in onCreateView", e);
-            Toast.makeText(getContext(), "Error initializing feed: " + e.getMessage(), 
-                Toast.LENGTH_SHORT).show();
-            return new View(requireContext());
+            Toast.makeText(getContext(), "Error loading feed: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            return inflater.inflate(R.layout.fragment_club_feed, container, false);
         }
     }
 
@@ -130,7 +124,7 @@ public class ClubFeedFragment extends Fragment implements PostAdapter.OnPostInte
 
         if (feedListener != null) {
             postsRef.removeEventListener(feedListener);
-    }
+        }
 
         progressBar.setVisibility(View.VISIBLE);
         emptyStateContainer.setVisibility(View.GONE);
@@ -242,7 +236,6 @@ public class ClubFeedFragment extends Fragment implements PostAdapter.OnPostInte
         super.onDestroyView();
         if (feedListener != null) {
             postsRef.removeEventListener(feedListener);
-            Log.d(TAG, "Removed posts listener");
         }
     }
 
@@ -285,117 +278,55 @@ public class ClubFeedFragment extends Fragment implements PostAdapter.OnPostInte
                         likedUsers.add(likedUserId);
                     }
                 }
-                if (!likedUsers.contains(userId)) {
-                    likedUsers.add(userId);
-                    likeRef.setValue(likedUsers)
-                        .addOnSuccessListener(aVoid -> Log.d(TAG, "Like added successfully"))
-                        .addOnFailureListener(e -> {
-                            Log.e(TAG, "Error adding like", e);
-                            Toast.makeText(getContext(), "Error adding like", Toast.LENGTH_SHORT).show();
-                        });
+                
+                boolean hasLiked = likedUsers.contains(userId);
+                
+                if (hasLiked) {
+                    // Remove like
+                    likeRef.getRef().removeValue()
+                        .addOnSuccessListener(aVoid -> Log.d(TAG, "Like removed"))
+                        .addOnFailureListener(e -> Log.e(TAG, "Error removing like", e));
+                } else {
+                    // Add like
+                    Map<String, Object> updates = new HashMap<>();
+                    updates.put(userId, true);
+                    likeRef.getRef().updateChildren(updates)
+                        .addOnSuccessListener(aVoid -> Log.d(TAG, "Like added"))
+                        .addOnFailureListener(e -> Log.e(TAG, "Error adding like", e));
                 }
             }
-
+            
             @Override
             public void onCancelled(@NonNull DatabaseError databaseError) {
-                Log.e(TAG, "Error adding like", databaseError.toException());
-                Toast.makeText(getContext(), "Error adding like", Toast.LENGTH_SHORT).show();
+                Log.e(TAG, "Error checking like status", databaseError.toException());
             }
         });
     }
 
     @Override
     public void onReactionSelected(Post post, String reactionType) {
-        if (!isAdded() || getContext() == null) return;
-        
-        String userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
-        DatabaseReference postRef = postsRef.child(post.getPostId());
-        
-        // First, remove any existing reactions from this user
-        if (post.getReactedUsers() != null) {
-            for (Map.Entry<String, List<String>> entry : post.getReactedUsers().entrySet()) {
-                if (entry.getValue().contains(userId)) {
-                    String oldReactionType = entry.getKey();
-                    DatabaseReference oldReactionRef = postRef.child("reactedUsers").child(oldReactionType);
-                    
-                    oldReactionRef.addListenerForSingleValueEvent(new ValueEventListener() {
-                        @Override
-                        public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
-                            List<String> reactedUsers = new ArrayList<>();
-                            for (DataSnapshot child : dataSnapshot.getChildren()) {
-                                String reactedUserId = child.getValue(String.class);
-                                if (reactedUserId != null && !reactedUserId.equals(userId)) {
-                                    reactedUsers.add(reactedUserId);
-                                }
-                            }
-                            if (reactedUsers.isEmpty()) {
-                                oldReactionRef.removeValue();
-                            } else {
-                                oldReactionRef.setValue(reactedUsers);
-                            }
-                        }
-
-                        @Override
-                        public void onCancelled(@NonNull DatabaseError databaseError) {
-                            Log.e(TAG, "Error removing old reaction", databaseError.toException());
-                        }
-                    });
-                }
-            }
-        }
-        
-        // Then add the new reaction
-        if (reactionType != null) {
-            DatabaseReference newReactionRef = postRef.child("reactedUsers").child(reactionType);
-            newReactionRef.addListenerForSingleValueEvent(new ValueEventListener() {
-                @Override
-                public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
-                    List<String> reactedUsers = new ArrayList<>();
-                    for (DataSnapshot child : dataSnapshot.getChildren()) {
-                        String reactedUserId = child.getValue(String.class);
-                        if (reactedUserId != null) {
-                            reactedUsers.add(reactedUserId);
-                        }
-                    }
-                    if (!reactedUsers.contains(userId)) {
-                        reactedUsers.add(userId);
-                        newReactionRef.setValue(reactedUsers)
-                            .addOnSuccessListener(aVoid -> Log.d(TAG, "Reaction added successfully"))
-                            .addOnFailureListener(e -> {
-                                Log.e(TAG, "Error adding reaction", e);
-                                Toast.makeText(getContext(), "Error adding reaction", Toast.LENGTH_SHORT).show();
-                            });
-                    }
-                }
-
-                @Override
-                public void onCancelled(@NonNull DatabaseError databaseError) {
-                    Log.e(TAG, "Error adding reaction", databaseError.toException());
-                    Toast.makeText(getContext(), "Error adding reaction", Toast.LENGTH_SHORT).show();
-                }
-            });
-        }
+        // TODO: Implement reaction functionality
+        Toast.makeText(getContext(), "Reaction: " + reactionType, Toast.LENGTH_SHORT).show();
     }
 
     @Override
     public void onLinkClicked(String url) {
         if (!isAdded() || getContext() == null) return;
+        
         try {
             Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
             startActivity(intent);
         } catch (Exception e) {
-            Toast.makeText(getContext(), "Error opening link", Toast.LENGTH_SHORT).show();
+            Log.e(TAG, "Error opening URL: " + url, e);
+            Toast.makeText(getContext(), "Could not open URL: " + e.getMessage(), Toast.LENGTH_SHORT).show();
         }
     }
 
     @Override
     public void onImageClicked(String imageUrl) {
         if (!isAdded() || getContext() == null) return;
-        try {
-            Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(imageUrl));
-            startActivity(intent);
-        } catch (Exception e) {
-            Toast.makeText(getContext(), "Error opening image", Toast.LENGTH_SHORT).show();
-        }
+        
+        // TODO: Implement full-screen image view
+        Toast.makeText(getContext(), "Image clicked: " + imageUrl, Toast.LENGTH_SHORT).show();
     }
 } 
