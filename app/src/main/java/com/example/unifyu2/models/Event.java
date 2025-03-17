@@ -14,7 +14,7 @@ public class Event implements Parcelable {
     private String venue;
     private long date;
     private String imageUrl;
-    private Map<String, String> registeredUsers;
+    private Map<String, Object> registeredUsers;
     private int maxParticipants;
     private boolean registrationOpen;
 
@@ -122,12 +122,12 @@ public class Event implements Parcelable {
     public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
     
     @PropertyName("registeredUsers")
-    public Map<String, String> getRegisteredUsers() { 
+    public Map<String, Object> getRegisteredUsers() { 
         return registeredUsers; 
     }
     
     @PropertyName("registeredUsers")
-    public void setRegisteredUsers(Map<String, String> registeredUsers) { 
+    public void setRegisteredUsers(Map<String, Object> registeredUsers) { 
         this.registeredUsers = registeredUsers; 
     }
     
@@ -156,7 +156,8 @@ public class Event implements Parcelable {
     }
 
     public String getRegisteredUserPhone(String userId) {
-        return registeredUsers != null ? registeredUsers.get(userId) : null;
+        Object value = registeredUsers != null ? registeredUsers.get(userId) : null;
+        return value != null ? value.toString() : null;
     }
 
     public boolean canRegister() {

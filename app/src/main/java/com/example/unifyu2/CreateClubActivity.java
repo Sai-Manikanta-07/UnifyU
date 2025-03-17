@@ -91,6 +91,9 @@ public class CreateClubActivity extends AppCompatActivity {
             "",  // No image URL initially
             currentUserId  // Set the current user as admin
         );
+        
+        // Set initial member count to 1 (admin)
+        newClub.setMemberCount(1);
 
         clubsRef.child(clubId).setValue(newClub)
             .addOnSuccessListener(aVoid -> {

@@ -17,7 +17,7 @@ public class Post {
     private String linkTitle;
     private String linkDescription;
     private Map<String, Boolean> likes;
-    private Map<String, Integer> reactions;
+    private Map<String, Object> reactions;
     private Map<String, List<String>> reactedUsers;
     private Object timestamp;
     private String postType;
@@ -57,19 +57,26 @@ public class Post {
     public String getUserId() { return userId != null ? userId : authorId; }
     public void setUserId(String userId) { this.userId = userId; }
 
-    public String getAuthorId() { return authorId != null ? authorId : userId; }
+    @PropertyName("authorId")  // For backward compatibility
+    public String getAuthorId() { return authorId; }
+    @PropertyName("authorId")
     public void setAuthorId(String authorId) { this.authorId = authorId; }
 
     public String getUserName() { return userName != null ? userName : authorName; }
     public void setUserName(String userName) { this.userName = userName; }
 
+    @PropertyName("authorName")  // For backward compatibility
+    public String getAuthorName() { return authorName; }
+    @PropertyName("authorName")
+    public void setAuthorName(String authorName) { this.authorName = authorName; }
+
     public String getContent() { return content; }
     public void setContent(String content) { this.content = content; }
 
-    public String getImageUrl() { return imageUrl != null ? imageUrl : ""; }
+    public String getImageUrl() { return imageUrl; }
     public void setImageUrl(String imageUrl) { this.imageUrl = imageUrl; }
 
-    public String getLinkUrl() { return linkUrl != null ? linkUrl : ""; }
+    public String getLinkUrl() { return linkUrl; }
     public void setLinkUrl(String linkUrl) { this.linkUrl = linkUrl; }
 
     public String getLinkTitle() { return linkTitle; }
@@ -78,31 +85,32 @@ public class Post {
     public String getLinkDescription() { return linkDescription; }
     public void setLinkDescription(String linkDescription) { this.linkDescription = linkDescription; }
 
-    public Map<String, Boolean> getLikes() { return likes != null ? likes : new HashMap<>(); }
+    public Map<String, Boolean> getLikes() { return likes; }
     public void setLikes(Map<String, Boolean> likes) { this.likes = likes; }
 
-    public Map<String, Integer> getReactions() { return reactions != null ? reactions : new HashMap<>(); }
-    public void setReactions(Map<String, Integer> reactions) { this.reactions = reactions; }
+    public Map<String, Object> getReactions() { return reactions; }
+    public void setReactions(Map<String, Object> reactions) { this.reactions = reactions; }
 
-    public Map<String, List<String>> getReactedUsers() { return reactedUsers != null ? reactedUsers : new HashMap<>(); }
+    public Map<String, List<String>> getReactedUsers() { return reactedUsers; }
     public void setReactedUsers(Map<String, List<String>> reactedUsers) { this.reactedUsers = reactedUsers; }
 
     public Object getTimestamp() { return timestamp; }
     public void setTimestamp(Object timestamp) { this.timestamp = timestamp; }
 
-    public Long getTimestampLong() {
-        if (timestamp instanceof Long) {
-            return (Long) timestamp;
-        } else if (timestamp instanceof Number) {
-            return ((Number) timestamp).longValue();
-        }
-        return 0L; // Default value if timestamp is not a number
-    }
-
     public String getPostType() { 
-        if (postType != null) return postType;
-        return imageUrl != null && !imageUrl.isEmpty() ? "IMAGE" : "TEXT";
+        if (postType == null) {
+            // Infer post type if not set
+            if (imageUrl != null && !imageUrl.isEmpty()) {
+                return "IMAGE";
+            } else if (linkUrl != null && !linkUrl.isEmpty()) {
+                return "LINK";
+            } else {
+                return "TEXT";
+            }
+        }
+        return postType; 
     }
+    
     public void setPostType(String postType) { this.postType = postType; }
 
     public String getClubId() { return clubId; }
@@ -111,40 +119,27 @@ public class Post {
     public String getClubName() { return clubName; }
     public void setClubName(String clubName) { this.clubName = clubName; }
 
-    public String getAuthorName() { return authorName != null ? authorName : userName; }
-    public void setAuthorName(String authorName) { this.authorName = authorName; }
-
     public int getTotalReactions() { 
-        if (totalReactions > 0) return totalReactions;
-        
-        int total = 0;
         if (reactions != null) {
-            for (Integer count : reactions.values()) {
-                total += count;
-            }
+            return reactions.size();
         }
-        if (reactedUsers != null) {
-            for (List<String> users : reactedUsers.values()) {
-                total += users.size();
-            }
-        }
-        return total;
+        return 0;
     }
+    
     public void setTotalReactions(int totalReactions) { this.totalReactions = totalReactions; }
-
-    public int getReactionCount(String reactionType) {
-        int count = 0;
-        
-        // Check reactions map
-        if (reactions != null && reactions.containsKey(reactionType)) {
-            count += reactions.get(reactionType);
+    
+    // Helper methods
+    public boolean isLikedBy(String userId) {
+        if (likes != null && likes.containsKey(userId)) {
+            return likes.get(userId);
         }
-        
-        // Check reactedUsers map
-        if (reactedUsers != null && reactedUsers.containsKey(reactionType)) {
-            count += reactedUsers.get(reactionType).size();
+        return false;
+    }
+    
+    public String getReactionByUser(String userId) {
+        if (reactions != null && reactions.containsKey(userId)) {
+            return reactions.get(userId).toString();
         }
-        
-        return count;
+        return null;
     }
 } 

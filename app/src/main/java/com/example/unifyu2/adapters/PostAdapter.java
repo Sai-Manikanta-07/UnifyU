@@ -7,6 +7,7 @@ import android.view.View;
 import android.view.ViewGroup;
 import android.widget.ImageView;
 import android.widget.TextView;
+import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.core.content.ContextCompat;
@@ -18,16 +19,24 @@ import com.example.unifyu2.models.Post;
 import com.google.android.material.button.MaterialButton;
 import com.google.android.material.card.MaterialCardView;
 import com.google.firebase.auth.FirebaseAuth;
+import com.google.firebase.database.DataSnapshot;
+import com.google.firebase.database.DatabaseError;
+import com.google.firebase.database.DatabaseReference;
+import com.google.firebase.database.FirebaseDatabase;
+import com.google.firebase.database.ValueEventListener;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 public class PostAdapter extends RecyclerView.Adapter<PostAdapter.PostViewHolder> {
+    private static final String TAG = "PostAdapter";
     private List<Post> posts;
     private Context context;
     private OnPostInteractionListener listener;
     private FirebaseAuth firebaseAuth;
+    private DatabaseReference clubsRef;
 
     public interface OnPostInteractionListener {
         void onLikeClicked(Post post);
@@ -41,6 +50,7 @@ public class PostAdapter extends RecyclerView.Adapter<PostAdapter.PostViewHolder
         this.listener = listener;
         this.posts = new ArrayList<>();
         this.firebaseAuth = FirebaseAuth.getInstance();
+        this.clubsRef = FirebaseDatabase.getInstance().getReference("clubs");
     }
 
     @NonNull
@@ -53,11 +63,22 @@ public class PostAdapter extends RecyclerView.Adapter<PostAdapter.PostViewHolder
     @Override
     public void onBindViewHolder(@NonNull PostViewHolder holder, int position) {
         try {
-        Post post = posts.get(position);
+            Post post = posts.get(position);
             
             // Set basic post info with null checks
             holder.authorNameText.setText(post.getUserName() != null ? post.getUserName() : "Unknown User");
             holder.contentText.setText(post.getContent() != null ? post.getContent() : "");
+            
+            // Set club name
+            if (post.getClubName() != null && !post.getClubName().isEmpty()) {
+                holder.clubNameText.setText(post.getClubName());
+                holder.clubNameText.setVisibility(View.VISIBLE);
+            } else if (post.getClubId() != null && !post.getClubId().isEmpty()) {
+                // If club name is not available but club ID is, fetch the club name
+                fetchClubName(post.getClubId(), holder.clubNameText);
+            } else {
+                holder.clubNameText.setVisibility(View.GONE);
+            }
             
             // Set timestamp
             if (post.getTimestamp() instanceof Long) {
@@ -123,50 +144,98 @@ public class PostAdapter extends RecyclerView.Adapter<PostAdapter.PostViewHolder
             holder.linkPreviewCard.setVisibility(View.GONE);
         }
     }
+    
+    private void fetchClubName(String clubId, TextView clubNameText) {
+        clubNameText.setText("Loading club...");
+        clubNameText.setVisibility(View.VISIBLE);
+        
+        clubsRef.child(clubId).addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                if (snapshot.exists()) {
+                    String clubName = snapshot.child("name").getValue(String.class);
+                    if (clubName != null && !clubName.isEmpty()) {
+                        clubNameText.setText(clubName);
+                    } else {
+                        clubNameText.setText("Unknown Club");
+                    }
+                } else {
+                    clubNameText.setText("Unknown Club");
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                clubNameText.setText("Unknown Club");
+            }
+        });
+    }
 
     private void updateReactionUI(PostViewHolder holder, Post post) {
         try {
             String currentUserId = firebaseAuth.getCurrentUser().getUid();
-            Map<String, Integer> reactions = post.getReactions();
-            Map<String, List<String>> reactedUsers = post.getReactedUsers();
             
-            // Update reaction count
-            int totalReactions = post.getTotalReactions();
-            holder.reactionCountText.setText(totalReactions + " reactions");
-            
-            // Check if user has reacted
-            boolean hasReacted = false;
+            // Get reaction counts
+            int totalReactions = 0;
             String userReaction = null;
             
-            // Check in reactedUsers first
-            if (reactedUsers != null) {
-                for (Map.Entry<String, List<String>> entry : reactedUsers.entrySet()) {
-                    if (entry.getValue().contains(currentUserId)) {
-                        hasReacted = true;
-                        userReaction = entry.getKey();
-                        break;
+            // Check if user has reacted
+            if (post.getReactions() != null) {
+                Map<String, String> userReactions = new HashMap<>();
+                
+                // Convert reactions to a more usable format
+                for (Map.Entry<String, Object> entry : post.getReactions().entrySet()) {
+                    if (entry.getKey().equals(currentUserId)) {
+                        userReaction = entry.getValue().toString();
                     }
+                    totalReactions++;
                 }
             }
             
-            // If not found in reactedUsers, check reactions count
-            if (!hasReacted && reactions != null) {
-                for (Map.Entry<String, Integer> entry : reactions.entrySet()) {
-                    if (entry.getValue() > 0) {
-                        hasReacted = true;
-                        userReaction = entry.getKey();
+            // Update reaction count text
+            holder.reactionCountText.setText(totalReactions + " reactions");
+            
+            // Update like button state based on user's reaction
+            if (userReaction != null) {
+                int colorRes = android.R.color.holo_blue_dark;
+                int color = ContextCompat.getColor(context, colorRes);
+                
+                holder.likeButton.setTextColor(color);
+                holder.likeButton.setIconTint(ContextCompat.getColorStateList(context, colorRes));
+                
+                // Update button text based on reaction type
+                switch (userReaction) {
+                    case "LIKE":
+                        holder.likeButton.setText("Liked");
                         break;
-                    }
+                    case "LOVE":
+                        holder.likeButton.setText("Loved");
+                        break;
+                    case "HAHA":
+                        holder.likeButton.setText("Haha");
+                        break;
+                    case "WOW":
+                        holder.likeButton.setText("Wow");
+                        break;
+                    case "SAD":
+                        holder.likeButton.setText("Sad");
+                        break;
+                    case "ANGRY":
+                        holder.likeButton.setText("Angry");
+                        break;
+                    default:
+                        holder.likeButton.setText("Like");
+                        break;
                 }
+            } else {
+                // Reset to default state
+                int colorRes = android.R.color.darker_gray;
+                int color = ContextCompat.getColor(context, colorRes);
+                
+                holder.likeButton.setTextColor(color);
+                holder.likeButton.setIconTint(ContextCompat.getColorStateList(context, colorRes));
+                holder.likeButton.setText("Like");
             }
-            
-            // Update like button state
-            boolean isLiked = "LIKE".equals(userReaction);
-            int colorRes = isLiked ? android.R.color.holo_blue_dark : android.R.color.darker_gray;
-            int color = ContextCompat.getColor(context, colorRes);
-            
-            holder.likeButton.setTextColor(color);
-            holder.likeButton.setIconTint(ContextCompat.getColorStateList(context, colorRes));
         } catch (Exception e) {
             // Set default state
             holder.reactionCountText.setText("0 reactions");
@@ -178,30 +247,11 @@ public class PostAdapter extends RecyclerView.Adapter<PostAdapter.PostViewHolder
     private void showReactionOptions(Post post) {
         try {
             String currentUserId = firebaseAuth.getCurrentUser().getUid();
-            Map<String, List<String>> reactedUsers = post.getReactedUsers();
+            String currentReaction = null;
             
             // Find current reaction
-            String currentReaction = null;
-            if (reactedUsers != null) {
-                for (Map.Entry<String, List<String>> entry : reactedUsers.entrySet()) {
-                    if (entry.getValue().contains(currentUserId)) {
-                        currentReaction = entry.getKey();
-                        break;
-                    }
-                }
-            }
-            
-            // If no reaction found in reactedUsers, check reactions map
-            if (currentReaction == null) {
-                Map<String, Integer> reactions = post.getReactions();
-                if (reactions != null) {
-                    for (Map.Entry<String, Integer> entry : reactions.entrySet()) {
-                        if (entry.getValue() > 0) {
-                            currentReaction = entry.getKey();
-                            break;
-                        }
-                    }
-                }
+            if (post.getReactions() != null && post.getReactions().containsKey(currentUserId)) {
+                currentReaction = post.getReactions().get(currentUserId).toString();
             }
             
             // Determine next reaction
@@ -212,7 +262,15 @@ public class PostAdapter extends RecyclerView.Adapter<PostAdapter.PostViewHolder
             else if (currentReaction.equals("HAHA")) newReaction = "WOW";
             else if (currentReaction.equals("WOW")) newReaction = "SAD";
             else if (currentReaction.equals("SAD")) newReaction = "ANGRY";
-            else newReaction = null;
+            else if (currentReaction.equals("ANGRY")) newReaction = null; // Remove reaction
+            else newReaction = "LIKE";
+            
+            // Show toast with the reaction
+            if (newReaction != null) {
+                Toast.makeText(context, "Reacted with: " + newReaction, Toast.LENGTH_SHORT).show();
+            } else {
+                Toast.makeText(context, "Reaction removed", Toast.LENGTH_SHORT).show();
+            }
             
             listener.onReactionSelected(post, newReaction);
         } catch (Exception e) {
@@ -258,6 +316,7 @@ public class PostAdapter extends RecyclerView.Adapter<PostAdapter.PostViewHolder
     }
 
     static class PostViewHolder extends RecyclerView.ViewHolder {
+        TextView clubNameText;
         TextView authorNameText;
         TextView timestampText;
         TextView contentText;
@@ -272,6 +331,7 @@ public class PostAdapter extends RecyclerView.Adapter<PostAdapter.PostViewHolder
 
         PostViewHolder(@NonNull View itemView) {
             super(itemView);
+            clubNameText = itemView.findViewById(R.id.clubNameText);
             authorNameText = itemView.findViewById(R.id.authorNameText);
             timestampText = itemView.findViewById(R.id.timestampText);
             contentText = itemView.findViewById(R.id.contentText);

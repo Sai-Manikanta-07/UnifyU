@@ -6,8 +6,11 @@ import com.google.firebase.FirebaseApp;
 import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.auth.FirebaseAuth;
+import com.example.unifyu2.utils.ClubMemberCountFixer;
 
 public class UnifyUApplication extends Application {
+    private static final String TAG = "UnifyUApplication";
+    
     @Override
     public void onCreate() {
         super.onCreate();
@@ -26,5 +29,17 @@ public class UnifyUApplication extends Application {
         
         // Set database settings
         FirebaseDatabase.getInstance().getReference().keepSynced(true);
+        
+        // Fix club member counts
+        fixClubMemberCounts();
+    }
+    
+    private void fixClubMemberCounts() {
+        // Only run this when a user is logged in
+        if (FirebaseAuth.getInstance().getCurrentUser() != null) {
+            Log.d(TAG, "Starting club member count synchronization");
+            ClubMemberCountFixer.synchronizeAllClubMemberCounts(() -> 
+                Log.d(TAG, "Club member count synchronization completed"));
+        }
     }
 } 

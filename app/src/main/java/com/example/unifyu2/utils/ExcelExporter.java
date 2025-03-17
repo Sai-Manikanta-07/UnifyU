@@ -15,6 +15,7 @@ import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.HashMap;
 
 public class ExcelExporter {
     private static final String[] HEADERS = {"Name", "Email", "Phone", "Registration Date"};
@@ -30,7 +31,12 @@ public class ExcelExporter {
             writer.write(String.join(",", HEADERS) + "\n");
 
             // Get phone numbers map
-            Map<String, String> phoneNumbers = event.getRegisteredUsers();
+            Map<String, String> phoneNumbers = new HashMap<>();
+            if (event.getRegisteredUsers() != null) {
+                for (Map.Entry<String, Object> entry : event.getRegisteredUsers().entrySet()) {
+                    phoneNumbers.put(entry.getKey(), entry.getValue().toString());
+                }
+            }
 
             // Write participant data
             for (User participant : participants) {

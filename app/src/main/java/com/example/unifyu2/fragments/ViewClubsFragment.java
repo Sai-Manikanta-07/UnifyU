@@ -196,4 +196,66 @@ public class ViewClubsFragment extends Fragment implements ClubAdapter.OnClubCli
         intent.putExtra("club", club);
         startActivity(intent);
     }
+    
+    @Override
+    public void onExitClubClick(Club club) {
+        showExitConfirmationDialog(club);
+    }
+    
+    private void showExitConfirmationDialog(Club club) {
+        new MaterialAlertDialogBuilder(requireContext())
+            .setTitle("Exit Club")
+            .setMessage("Are you sure you want to exit " + club.getName() + "?")
+            .setPositiveButton("Exit", (dialog, which) -> exitClub(club))
+            .setNegativeButton("Cancel", null)
+            .show();
+    }
+    
+    private void exitClub(Club club) {
+        String userId = firebaseAuth.getCurrentUser().getUid();
+        String membershipId = userId + "_" + club.getId();
+        
+        // Show progress
+        progressBar.setVisibility(View.VISIBLE);
+        
+        // Remove membership
+        membershipsRef.child(membershipId).removeValue()
+            .addOnSuccessListener(aVoid -> {
+                // Decrement member count
+                decrementMemberCount(club.getId());
+            })
+            .addOnFailureListener(e -> {
+                progressBar.setVisibility(View.GONE);
+                Toast.makeText(getContext(),
+                    "Failed to exit club: " + e.getMessage(),
+                    Toast.LENGTH_LONG).show();
+            });
+    }
+    
+    private void decrementMemberCount(String clubId) {
+        DatabaseReference clubRef = clubsRef.child(clubId).child("memberCount");
+        clubRef.get().addOnCompleteListener(task -> {
+            if (task.isSuccessful()) {
+                Integer currentCount = task.getResult().getValue(Integer.class);
+                if (currentCount != null && currentCount > 0) {
+                    int newCount = currentCount - 1;
+                    clubRef.setValue(newCount).addOnCompleteListener(updateTask -> {
+                        progressBar.setVisibility(View.GONE);
+                        if (updateTask.isSuccessful()) {
+                            Toast.makeText(getContext(),
+                                "Successfully exited club",
+                                Toast.LENGTH_SHORT).show();
+                        }
+                    });
+                } else {
+                    progressBar.setVisibility(View.GONE);
+                }
+            } else {
+                progressBar.setVisibility(View.GONE);
+                Toast.makeText(getContext(),
+                    "Error updating member count",
+                    Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
 } 

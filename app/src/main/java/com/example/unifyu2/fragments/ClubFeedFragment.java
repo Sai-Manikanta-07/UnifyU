@@ -133,12 +133,11 @@ public class ClubFeedFragment extends Fragment implements PostAdapter.OnPostInte
         try {
             Log.d(TAG, "Starting to load posts from: " + postsRef.toString());
             Log.d(TAG, "Looking for posts matching club IDs: " + clubIds);
-            Log.d(TAG, "Current user ID: " + FirebaseAuth.getInstance().getCurrentUser().getUid());
             
             // Query posts for all clubs in one go
             feedListener = postsRef.addValueEventListener(new ValueEventListener() {
-                    @Override
-                    public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
+                @Override
+                public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
                     if (!isAdded() || getContext() == null) {
                         Log.d(TAG, "Fragment not attached during data change");
                         return;
@@ -150,44 +149,23 @@ public class ClubFeedFragment extends Fragment implements PostAdapter.OnPostInte
                         
                         for (DataSnapshot snapshot : dataSnapshot.getChildren()) {
                             try {
-                                Log.d(TAG, "Raw post data: " + snapshot.getValue());
-                                
-                                // First try to get clubId directly
-                                String postClubId = snapshot.child("clubId").getValue(String.class);
-                                Log.d(TAG, "Post " + snapshot.getKey() + " has clubId: " + postClubId);
-                                
-                                if (postClubId != null && clubIds.contains(postClubId)) {
-                                    Post post = snapshot.getValue(Post.class);
-                                    if (post != null) {
-                                        // Handle missing fields
-                                        if (post.getPostId() == null) {
-                                            post.setPostId(snapshot.getKey());
-                                        }
-                                        if (post.getUserId() == null && post.getAuthorId() != null) {
-                                            post.setUserId(post.getAuthorId());
-                                        }
-                                        if (post.getUserName() == null && post.getAuthorName() != null) {
-                                            post.setUserName(post.getAuthorName());
-                                        }
-                                        if (post.getPostType() == null) {
-                                            post.setPostType(post.getImageUrl() != null && !post.getImageUrl().isEmpty() ? "IMAGE" : "TEXT");
-                                        }
-                                        
+                                // Get post data
+                                Post post = snapshot.getValue(Post.class);
+                                if (post != null) {
+                                    // Set post ID
+                                    post.setPostId(snapshot.getKey());
+                                    
+                                    // Check if post belongs to one of the user's clubs
+                                    String postClubId = post.getClubId();
+                                    if (postClubId != null && clubIds.contains(postClubId)) {
                                         posts.add(post);
-                                        Log.d(TAG, "Added post: " + post.getPostId() + 
-                                            " from club: " + post.getClubId() + 
-                                            " by user: " + post.getUserName() + 
-                                            " with type: " + post.getPostType());
                                     } else {
-                                        Log.e(TAG, "Failed to parse post from data: " + snapshot.getValue());
+                                        Log.d(TAG, "Skipped post: clubId " + postClubId + 
+                                            " not in user's clubs: " + clubIds);
                                     }
-                                } else {
-                                    Log.d(TAG, "Skipped post: clubId " + postClubId + 
-                                        " not in user's clubs: " + clubIds);
                                 }
                             } catch (Exception e) {
                                 Log.e(TAG, "Error parsing post: " + snapshot.getKey(), e);
-                                e.printStackTrace();
                             }
                         }
 
@@ -216,10 +194,10 @@ public class ClubFeedFragment extends Fragment implements PostAdapter.OnPostInte
                         progressBar.setVisibility(View.GONE);
                         swipeRefreshLayout.setRefreshing(false);
                     }
-                    }
+                }
 
-                    @Override
-                    public void onCancelled(@NonNull DatabaseError databaseError) {
+                @Override
+                public void onCancelled(@NonNull DatabaseError databaseError) {
                     if (!isAdded() || getContext() == null) return;
                     Log.e(TAG, "Database error", databaseError.toException());
                     showError("Error loading posts: " + databaseError.getMessage());
@@ -266,47 +244,50 @@ public class ClubFeedFragment extends Fragment implements PostAdapter.OnPostInte
         if (!isAdded() || getContext() == null) return;
         
         String userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
-        DatabaseReference likeRef = postsRef.child(post.getPostId()).child("reactedUsers").child("LIKE");
+        DatabaseReference postRef = FirebaseDatabase.getInstance().getReference("posts").child(post.getPostId());
         
-        likeRef.addListenerForSingleValueEvent(new ValueEventListener() {
+        // Update reactions
+        postRef.child("reactions").child(userId).addListenerForSingleValueEvent(new ValueEventListener() {
             @Override
-            public void onDataChange(@NonNull DataSnapshot dataSnapshot) {
-                List<String> likedUsers = new ArrayList<>();
-                for (DataSnapshot child : dataSnapshot.getChildren()) {
-                    String likedUserId = child.getValue(String.class);
-                    if (likedUserId != null) {
-                        likedUsers.add(likedUserId);
-                    }
-                }
-                
-                boolean hasLiked = likedUsers.contains(userId);
-                
-                if (hasLiked) {
-                    // Remove like
-                    likeRef.getRef().removeValue()
-                        .addOnSuccessListener(aVoid -> Log.d(TAG, "Like removed"))
-                        .addOnFailureListener(e -> Log.e(TAG, "Error removing like", e));
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                if (snapshot.exists()) {
+                    // User already reacted, toggle like off
+                    postRef.child("reactions").child(userId).removeValue()
+                        .addOnSuccessListener(aVoid -> Log.d(TAG, "Reaction removed"))
+                        .addOnFailureListener(e -> Log.e(TAG, "Failed to remove reaction", e));
                 } else {
-                    // Add like
-                    Map<String, Object> updates = new HashMap<>();
-                    updates.put(userId, true);
-                    likeRef.getRef().updateChildren(updates)
+                    // User hasn't reacted, add like
+                    postRef.child("reactions").child(userId).setValue("LIKE")
                         .addOnSuccessListener(aVoid -> Log.d(TAG, "Like added"))
-                        .addOnFailureListener(e -> Log.e(TAG, "Error adding like", e));
+                        .addOnFailureListener(e -> Log.e(TAG, "Failed to add like", e));
                 }
             }
             
             @Override
-            public void onCancelled(@NonNull DatabaseError databaseError) {
-                Log.e(TAG, "Error checking like status", databaseError.toException());
+            public void onCancelled(@NonNull DatabaseError error) {
+                Log.e(TAG, "Database error", error.toException());
             }
         });
     }
 
     @Override
     public void onReactionSelected(Post post, String reactionType) {
-        // TODO: Implement reaction functionality
-        Toast.makeText(getContext(), "Reaction: " + reactionType, Toast.LENGTH_SHORT).show();
+        if (!isAdded() || getContext() == null) return;
+        
+        String userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
+        DatabaseReference postRef = FirebaseDatabase.getInstance().getReference("posts").child(post.getPostId());
+        
+        if (reactionType == null) {
+            // Remove reaction
+            postRef.child("reactions").child(userId).removeValue()
+                .addOnSuccessListener(aVoid -> Log.d(TAG, "Reaction removed"))
+                .addOnFailureListener(e -> Log.e(TAG, "Failed to remove reaction", e));
+        } else {
+            // Add or update reaction
+            postRef.child("reactions").child(userId).setValue(reactionType)
+                .addOnSuccessListener(aVoid -> Log.d(TAG, "Reaction updated: " + reactionType))
+                .addOnFailureListener(e -> Log.e(TAG, "Failed to update reaction", e));
+        }
     }
 
     @Override
@@ -317,8 +298,8 @@ public class ClubFeedFragment extends Fragment implements PostAdapter.OnPostInte
             Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
             startActivity(intent);
         } catch (Exception e) {
-            Log.e(TAG, "Error opening URL: " + url, e);
-            Toast.makeText(getContext(), "Could not open URL: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+            Log.e(TAG, "Error opening link", e);
+            Toast.makeText(getContext(), "Could not open link: " + e.getMessage(), Toast.LENGTH_SHORT).show();
         }
     }
 
@@ -326,7 +307,12 @@ public class ClubFeedFragment extends Fragment implements PostAdapter.OnPostInte
     public void onImageClicked(String imageUrl) {
         if (!isAdded() || getContext() == null) return;
         
-        // TODO: Implement full-screen image view
-        Toast.makeText(getContext(), "Image clicked: " + imageUrl, Toast.LENGTH_SHORT).show();
+        try {
+            Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(imageUrl));
+            startActivity(intent);
+        } catch (Exception e) {
+            Log.e(TAG, "Error opening image", e);
+            Toast.makeText(getContext(), "Could not open image: " + e.getMessage(), Toast.LENGTH_SHORT).show();
+        }
     }
 } 

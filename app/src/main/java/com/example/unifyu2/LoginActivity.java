@@ -5,6 +5,7 @@ import android.content.Intent;
 import android.os.Bundle;
 import android.text.TextUtils;
 import android.widget.Toast;
+import android.util.Log;
 
 import androidx.appcompat.app.AppCompatActivity;
 
@@ -14,8 +15,10 @@ import com.google.firebase.auth.FirebaseAuth;
 import com.google.firebase.auth.FirebaseUser;
 
 import com.example.unifyu2.utils.FirebaseErrorUtils;
+import com.example.unifyu2.utils.ClubMemberCountFixer;
 
 public class LoginActivity extends AppCompatActivity {
+    private static final String TAG = "LoginActivity";
     private TextInputEditText emailEditText, passwordEditText;
     private FirebaseAuth firebaseAuth;
     private ProgressDialog progressDialog;
@@ -78,6 +81,9 @@ public class LoginActivity extends AppCompatActivity {
                 .addOnCompleteListener(this, task -> {
                     progressDialog.dismiss();
                     if (task.isSuccessful()) {
+                        // Fix club member counts
+                        fixClubMemberCounts();
+                        
                         // Login success, navigate to MainActivity
                         startActivity(new Intent(LoginActivity.this, MainActivity.class));
                         finish();
@@ -89,5 +95,11 @@ public class LoginActivity extends AppCompatActivity {
                         Toast.makeText(this, errorMessage, Toast.LENGTH_LONG).show();
                     }
                 });
+    }
+    
+    private void fixClubMemberCounts() {
+        Log.d(TAG, "Starting club member count synchronization after login");
+        ClubMemberCountFixer.synchronizeAllClubMemberCounts(() -> 
+            Log.d(TAG, "Club member count synchronization completed after login"));
     }
 } 

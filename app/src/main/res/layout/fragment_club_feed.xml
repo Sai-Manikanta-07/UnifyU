@@ -5,7 +5,7 @@
     xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="?attr/colorSurface">
+    android:background="#F5F5F5">
 
     <androidx.swiperefreshlayout.widget.SwipeRefreshLayout
         android:id="@+id/swipeRefreshLayout"
@@ -16,23 +16,43 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent">
 
+            <!-- Feed Header -->
             <LinearLayout
+                android:id="@+id/feedHeaderContainer"
                 android:layout_width="match_parent"
-                android:layout_height="match_parent"
-                android:orientation="vertical">
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:background="@android:color/white"
+                android:elevation="2dp"
+                android:visibility="gone">
 
-                <!-- Posts Section -->
-                <androidx.recyclerview.widget.RecyclerView
-                    android:id="@+id/recyclerView"
+                <TextView
                     android:layout_width="match_parent"
-                    android:layout_height="match_parent"
-                    android:clipToPadding="false"
-                    android:paddingTop="8dp"
-                    android:paddingBottom="80dp"
-                    android:scrollbars="vertical"
-                    android:scrollbarStyle="outsideOverlay" />
+                    android:layout_height="wrap_content"
+                    android:text="Your Club Feed"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:padding="16dp"
+                    android:gravity="center"/>
+
+                <View
+                    android:layout_width="match_parent"
+                    android:layout_height="1dp"
+                    android:background="#E0E0E0"/>
             </LinearLayout>
 
+            <!-- Posts Section -->
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/recyclerView"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:clipToPadding="false"
+                android:paddingTop="8dp"
+                android:paddingBottom="80dp"
+                android:scrollbars="vertical"
+                android:scrollbarStyle="outsideOverlay" />
+
+            <!-- Empty State -->
             <LinearLayout
                 android:id="@+id/emptyStateContainer"
                 android:layout_width="match_parent"
@@ -47,41 +67,40 @@
                 <ImageView
                     android:layout_width="120dp"
                     android:layout_height="120dp"
-                    android:alpha="0.7"
-                    android:src="@drawable/ic_feed_empty"
-                    app:tint="?attr/colorPrimary" />
+                    android:src="@drawable/ic_notification"
+                    android:alpha="0.5"
+                    android:contentDescription="Empty state icon"/>
 
                 <TextView
                     android:id="@+id/emptyView"
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="16dp"
-                    android:gravity="center"
-                    android:text="No posts yet"
-                    android:textAppearance="?attr/textAppearanceHeadline6" />
+                    android:text="No posts to display"
+                    android:textSize="18sp"
+                    android:textStyle="bold"
+                    android:textColor="#757575"/>
 
                 <TextView
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content"
                     android:layout_marginTop="8dp"
-                    android:gravity="center"
-                    android:text="Be the first one to share something!"
-                    android:textAppearance="?attr/textAppearanceBody2"
-                    android:alpha="0.7" />
-
+                    android:text="Join more clubs to see posts in your feed"
+                    android:textSize="14sp"
+                    android:textColor="#9E9E9E"
+                    android:gravity="center"/>
             </LinearLayout>
 
+            <!-- Loading Indicator -->
             <com.google.android.material.progressindicator.CircularProgressIndicator
                 android:id="@+id/progressBar"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_gravity="center"
                 android:indeterminate="true"
-                android:visibility="gone"
-                app:indicatorSize="48dp" />
-
+                app:indicatorColor="?attr/colorPrimary"
+                android:visibility="gone"/>
         </FrameLayout>
-
     </androidx.swiperefreshlayout.widget.SwipeRefreshLayout>
 
 </androidx.coordinatorlayout.widget.CoordinatorLayout> 

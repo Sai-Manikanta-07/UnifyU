@@ -28,29 +28,39 @@
             android:layout_marginTop="4dp"
             android:textSize="14sp" />
 
-        <com.google.android.material.chip.Chip
-            android:id="@+id/membershipStatus"
-            android:layout_width="wrap_content"
+        <LinearLayout
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="Member"
-            android:visibility="gone"
-            app:chipBackgroundColor="@color/primary"
-            app:chipIcon="@drawable/ic_check"
-            android:textColor="@color/white" />
+            android:orientation="horizontal"
+            android:layout_marginTop="8dp">
 
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/exitButton"
-            style="@style/Widget.MaterialComponents.Button.OutlinedButton"
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="8dp"
-            android:text="Exit Club"
-            android:visibility="gone"
-            app:icon="@drawable/ic_exit"
-            app:iconTint="@android:color/holo_red_dark"
-            android:textColor="@android:color/holo_red_dark"
-            app:strokeColor="@android:color/holo_red_dark" />
+            <com.google.android.material.chip.Chip
+                android:id="@+id/membershipStatus"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Member"
+                android:visibility="gone"
+                app:chipBackgroundColor="@color/primary"
+                app:chipIcon="@drawable/ic_check"
+                android:textColor="@color/white" />
+
+            <Space
+                android:layout_width="0dp"
+                android:layout_height="wrap_content"
+                android:layout_weight="1" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/exitButton"
+                style="@style/Widget.MaterialComponents.Button.OutlinedButton"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="Exit Club"
+                android:visibility="gone"
+                app:icon="@drawable/ic_exit"
+                app:iconTint="@android:color/holo_red_dark"
+                android:textColor="@android:color/holo_red_dark"
+                app:strokeColor="@android:color/holo_red_dark" />
+        </LinearLayout>
 
         <LinearLayout
             android:layout_width="match_parent"

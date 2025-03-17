@@ -121,9 +121,8 @@ public class ViewClubsActivity extends AppCompatActivity implements ClubAdapter.
                     ClubMembership membership = new ClubMembership(userId, club.getId());
                     membershipsRef.child(membershipId).setValue(membership)
                             .addOnSuccessListener(aVoid -> {
-                                Toast.makeText(this,
-                                    getString(R.string.join_success, club.getName()),
-                                    Toast.LENGTH_SHORT).show();
+                                // Increment member count
+                                incrementMemberCount(club.getId());
                             })
                             .addOnFailureListener(e -> {
                                 Toast.makeText(this,
@@ -135,6 +134,24 @@ public class ViewClubsActivity extends AppCompatActivity implements ClubAdapter.
                 Toast.makeText(this,
                     getString(R.string.error_checking_membership),
                     Toast.LENGTH_LONG).show();
+            }
+        });
+    }
+
+    private void incrementMemberCount(String clubId) {
+        DatabaseReference clubRef = FirebaseDatabase.getInstance().getReference("clubs")
+            .child(clubId).child("memberCount");
+        clubRef.get().addOnCompleteListener(task -> {
+            if (task.isSuccessful()) {
+                Integer currentCount = task.getResult().getValue(Integer.class);
+                int newCount = (currentCount != null ? currentCount : 0) + 1;
+                clubRef.setValue(newCount).addOnCompleteListener(updateTask -> {
+                    if (updateTask.isSuccessful()) {
+                        Toast.makeText(this,
+                            getString(R.string.join_success),
+                            Toast.LENGTH_SHORT).show();
+                    }
+                });
             }
         });
     }
@@ -153,5 +170,66 @@ public class ViewClubsActivity extends AppCompatActivity implements ClubAdapter.
         Intent intent = new Intent(this, ManageClubActivity.class);
         intent.putExtra("club", club);
         startActivity(intent);
+    }
+
+    @Override
+    public void onExitClubClick(Club club) {
+        new MaterialAlertDialogBuilder(this)
+            .setTitle("Exit Club")
+            .setMessage("Are you sure you want to exit " + club.getName() + "?")
+            .setPositiveButton("Exit", (dialog, which) -> exitClub(club))
+            .setNegativeButton("Cancel", null)
+            .show();
+    }
+    
+    private void exitClub(Club club) {
+        String userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
+        String membershipId = userId + "_" + club.getId();
+        
+        // Show progress
+        progressBar.setVisibility(View.VISIBLE);
+        
+        // Remove membership
+        DatabaseReference membershipsRef = FirebaseDatabase.getInstance().getReference("memberships");
+        membershipsRef.child(membershipId).removeValue()
+            .addOnSuccessListener(aVoid -> {
+                // Decrement member count
+                decrementMemberCount(club.getId());
+            })
+            .addOnFailureListener(e -> {
+                progressBar.setVisibility(View.GONE);
+                Toast.makeText(this,
+                    "Failed to exit club: " + e.getMessage(),
+                    Toast.LENGTH_LONG).show();
+            });
+    }
+    
+    private void decrementMemberCount(String clubId) {
+        DatabaseReference clubRef = FirebaseDatabase.getInstance().getReference("clubs").child(clubId).child("memberCount");
+        clubRef.get().addOnCompleteListener(task -> {
+            if (task.isSuccessful()) {
+                Integer currentCount = task.getResult().getValue(Integer.class);
+                if (currentCount != null && currentCount > 0) {
+                    int newCount = currentCount - 1;
+                    clubRef.setValue(newCount).addOnCompleteListener(updateTask -> {
+                        progressBar.setVisibility(View.GONE);
+                        if (updateTask.isSuccessful()) {
+                            Toast.makeText(this,
+                                "Successfully exited club",
+                                Toast.LENGTH_SHORT).show();
+                            // Refresh the clubs list
+                            loadClubs();
+                        }
+                    });
+                } else {
+                    progressBar.setVisibility(View.GONE);
+                }
+            } else {
+                progressBar.setVisibility(View.GONE);
+                Toast.makeText(this,
+                    "Error updating member count",
+                    Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 } 

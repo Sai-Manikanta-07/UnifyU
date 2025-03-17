@@ -63,6 +63,7 @@ import androidx.appcompat.app.AppCompatActivity;
 import com.example.unifyu2.adapters.ManageClubMembersAdapter;
 import com.google.firebase.database.*;
 import android.util.Log;
+import androidx.appcompat.widget.Toolbar;
 
 public class ManageClubActivity extends AppCompatActivity implements ManageClubMembersAdapter.OnMemberActionListener {
     private static final String TAG = "ManageClubActivity";
@@ -80,12 +81,18 @@ public class ManageClubActivity extends AppCompatActivity implements ManageClubM
     private RecyclerView membersRecyclerView;
     private ManageClubMembersAdapter adapter;
     private List<User> membersList;
+    private FirebaseAuth firebaseAuth;
+    private String currentUserId;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_manage_club);
 
+        // Initialize Firebase
+        firebaseAuth = FirebaseAuth.getInstance();
+        currentUserId = firebaseAuth.getCurrentUser().getUid();
+        
         // Get club from intent
         club = getIntent().getParcelableExtra("club");
         if (club == null) {
@@ -100,22 +107,22 @@ public class ManageClubActivity extends AppCompatActivity implements ManageClubM
             finish();
             return;
         }
-
-        // Initialize Firebase references
+        
         clubRef = FirebaseDatabase.getInstance().getReference("clubs").child(clubId);
         postsRef = FirebaseDatabase.getInstance().getReference("posts");
         membershipsRef = FirebaseDatabase.getInstance().getReference("memberships");
         usersRef = FirebaseDatabase.getInstance().getReference("users");
         storageRef = FirebaseStorage.getInstance().getReference();
         membersList = new ArrayList<>();
-
+        
         // Setup toolbar
-        setSupportActionBar(findViewById(R.id.toolbar));
+        Toolbar toolbar = findViewById(R.id.toolbar);
+        setSupportActionBar(toolbar);
         if (getSupportActionBar() != null) {
             getSupportActionBar().setDisplayHomeAsUpEnabled(true);
             getSupportActionBar().setTitle("Manage " + club.getName());
         }
-
+        
         // Setup image picker
         imagePickerLauncher = registerForActivityResult(
             new ActivityResultContracts.StartActivityForResult(),
@@ -128,21 +135,98 @@ public class ManageClubActivity extends AppCompatActivity implements ManageClubM
                     }
                 }
             });
-
+        
         // Setup RecyclerView
         membersRecyclerView = findViewById(R.id.membersRecyclerView);
         membersRecyclerView.setLayoutManager(new LinearLayoutManager(this));
         adapter = new ManageClubMembersAdapter(this, membersList, this);
         membersRecyclerView.setAdapter(adapter);
-
+        
         // Setup UI and load members
         setupUI();
         loadMembers();
+        
+        // Synchronize member count
+        synchronizeMemberCount();
     }
 
     private void setupUI() {
         // No buttons to setup in the new layout
-        loadMembers();
+    }
+
+    private void loadMembers() {
+        DatabaseReference membershipsRef = FirebaseDatabase.getInstance().getReference("memberships");
+        Query clubMembershipsQuery = membershipsRef.orderByChild("clubId").equalTo(clubId);
+        
+        clubMembershipsQuery.addValueEventListener(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                membersList.clear();
+                for (DataSnapshot membershipSnapshot : snapshot.getChildren()) {
+                    String userId = membershipSnapshot.child("userId").getValue(String.class);
+                    if (userId != null) {
+                        loadMemberDetails(userId);
+                    }
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                Log.e(TAG, "Error loading memberships: " + error.getMessage());
+                Toast.makeText(ManageClubActivity.this, "Error loading members", Toast.LENGTH_SHORT).show();
+            }
+        });
+    }
+
+    private void loadMemberDetails(String userId) {
+        DatabaseReference userRef = FirebaseDatabase.getInstance().getReference("users").child(userId);
+        userRef.addListenerForSingleValueEvent(new ValueEventListener() {
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                if (snapshot.exists()) {
+                    User user = new User();
+                    user.setId(snapshot.getKey());
+                    user.setUsername(snapshot.child("username").getValue(String.class));
+                    user.setEmail(snapshot.child("email").getValue(String.class));
+                    
+                    membersList.add(user);
+                    adapter.notifyDataSetChanged();
+                }
+            }
+
+            @Override
+            public void onCancelled(@NonNull DatabaseError error) {
+                Log.e(TAG, "Error loading user details: " + error.getMessage());
+            }
+        });
+    }
+
+    private void synchronizeMemberCount() {
+        membershipsRef.orderByChild("clubId").equalTo(clubId)
+            .addListenerForSingleValueEvent(new ValueEventListener() {
+                @Override
+                public void onDataChange(@NonNull DataSnapshot snapshot) {
+                    int actualMemberCount = (int) snapshot.getChildrenCount();
+                    
+                    // Update the club's member count if it's different
+                    if (club.getMemberCount() != actualMemberCount) {
+                        clubRef.child("memberCount").setValue(actualMemberCount)
+                            .addOnSuccessListener(aVoid -> {
+                                Log.d(TAG, "Member count synchronized: " + actualMemberCount);
+                                // Update local club object
+                                club.setMemberCount(actualMemberCount);
+                            })
+                            .addOnFailureListener(e -> {
+                                Log.e(TAG, "Failed to synchronize member count", e);
+                            });
+                    }
+                }
+
+                @Override
+                public void onCancelled(@NonNull DatabaseError error) {
+                    Log.e(TAG, "Error counting members", error.toException());
+                }
+            });
     }
 
     private void showCreatePostDialog() {
@@ -363,53 +447,6 @@ public class ManageClubActivity extends AppCompatActivity implements ManageClubM
             .addOnFailureListener(e -> 
                 Toast.makeText(this, "Failed to update club details", Toast.LENGTH_SHORT).show()
             );
-    }
-
-    private void loadMembers() {
-        DatabaseReference membershipsRef = FirebaseDatabase.getInstance().getReference("memberships");
-        Query clubMembershipsQuery = membershipsRef.orderByChild("clubId").equalTo(clubId);
-        
-        clubMembershipsQuery.addValueEventListener(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot snapshot) {
-                membersList.clear();
-                for (DataSnapshot membershipSnapshot : snapshot.getChildren()) {
-                    String userId = membershipSnapshot.child("userId").getValue(String.class);
-                    if (userId != null) {
-                        loadMemberDetails(userId);
-                    }
-                }
-            }
-
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {
-                Log.e(TAG, "Error loading memberships: " + error.getMessage());
-                Toast.makeText(ManageClubActivity.this, "Error loading members", Toast.LENGTH_SHORT).show();
-            }
-        });
-    }
-
-    private void loadMemberDetails(String userId) {
-        DatabaseReference userRef = FirebaseDatabase.getInstance().getReference("users").child(userId);
-        userRef.addListenerForSingleValueEvent(new ValueEventListener() {
-            @Override
-            public void onDataChange(@NonNull DataSnapshot snapshot) {
-                if (snapshot.exists()) {
-                    User user = new User();
-                    user.setId(snapshot.getKey());
-                    user.setUsername(snapshot.child("username").getValue(String.class));
-                    user.setEmail(snapshot.child("email").getValue(String.class));
-                    
-                    membersList.add(user);
-                    adapter.notifyDataSetChanged();
-                }
-            }
-
-            @Override
-            public void onCancelled(@NonNull DatabaseError error) {
-                Log.e(TAG, "Error loading user details: " + error.getMessage());
-            }
-        });
     }
 
     @Override

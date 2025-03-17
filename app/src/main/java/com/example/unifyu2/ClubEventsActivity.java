@@ -31,6 +31,7 @@ import com.google.firebase.database.ValueEventListener;
 
 import java.util.ArrayList;
 import java.util.Calendar;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -252,58 +253,52 @@ public class ClubEventsActivity extends AppCompatActivity implements EnhancedEve
 
     @Override
     public void onViewParticipants(Event event) {
-        View dialogView = getLayoutInflater().inflate(R.layout.dialog_event_participants, null);
-        
-        TextView eventTitleText = dialogView.findViewById(R.id.eventTitleText);
-        TextView participantCountText = dialogView.findViewById(R.id.participantCountText);
+        View dialogView = getLayoutInflater().inflate(R.layout.dialog_participants, null);
         RecyclerView participantsRecyclerView = dialogView.findViewById(R.id.participantsRecyclerView);
-
-        eventTitleText.setText(event.getTitle());
-        
-        List<User> participants = new ArrayList<>();
-        Map<String, String> phoneNumbers = event.getRegisteredUsers();
-        ParticipantAdapter adapter = new ParticipantAdapter(participants, phoneNumbers);
         participantsRecyclerView.setLayoutManager(new LinearLayoutManager(this));
-        participantsRecyclerView.setAdapter(adapter);
 
-        AlertDialog dialog = new MaterialAlertDialogBuilder(this)
-            .setTitle(event.getTitle() + " - Participants")
-            .setView(dialogView)
-            .setPositiveButton("Close", null)
-            .create();
-
-        // Load participants
-        if (event.getRegisteredUsers() != null) {
-            int totalParticipants = event.getRegisteredUsers().size();
-            participantCountText.setText(totalParticipants + " participants");
-
-            for (String userId : event.getRegisteredUsers().keySet()) {
-                usersRef.child(userId).addListenerForSingleValueEvent(new ValueEventListener() {
-                    @Override
-                    public void onDataChange(@NonNull DataSnapshot snapshot) {
-                        User user = snapshot.getValue(User.class);
-                        if (user != null) {
-                            user.setId(snapshot.getKey());
-                            participants.add(user);
-                            adapter.notifyDataSetChanged();
-                        }
-                    }
-
-                    @Override
-                    public void onCancelled(@NonNull DatabaseError error) {
-                        Log.e(TAG, "Error loading participant: " + error.getMessage());
-                    }
-                });
-            }
-        } else {
-            participantCountText.setText("0 participants");
+        // Convert Map<String, Object> to Map<String, String>
+        Map<String, String> phoneNumbers = new HashMap<>();
+        for (Map.Entry<String, Object> entry : event.getRegisteredUsers().entrySet()) {
+            phoneNumbers.put(entry.getKey(), entry.getValue().toString());
         }
 
-        dialogView.findViewById(R.id.downloadButton).setOnClickListener(v -> {
-            ExcelExporter.exportParticipants(this, event, participants);
-        });
+        ParticipantAdapter adapter = new ParticipantAdapter(new ArrayList<>(), phoneNumbers);
+        participantsRecyclerView.setAdapter(adapter);
 
-        dialog.show();
+        // Load user details for registered participants
+        List<String> userIds = new ArrayList<>(event.getRegisteredUsers().keySet());
+        if (!userIds.isEmpty()) {
+            usersRef.addListenerForSingleValueEvent(new ValueEventListener() {
+                @Override
+                public void onDataChange(@NonNull DataSnapshot snapshot) {
+                    List<User> participants = new ArrayList<>();
+                    for (String userId : userIds) {
+                        DataSnapshot userSnapshot = snapshot.child(userId);
+                        if (userSnapshot.exists()) {
+                            User user = userSnapshot.getValue(User.class);
+                            if (user != null) {
+                                user.setId(userId);
+                                participants.add(user);
+                            }
+                        }
+                    }
+                    adapter.updateParticipants(participants);
+                }
+
+                @Override
+                public void onCancelled(@NonNull DatabaseError error) {
+                    Toast.makeText(ClubEventsActivity.this, 
+                        "Error loading participants", Toast.LENGTH_SHORT).show();
+                }
+            });
+        }
+
+        new MaterialAlertDialogBuilder(this)
+            .setTitle("Event Participants")
+            .setView(dialogView)
+            .setPositiveButton("Close", null)
+            .show();
     }
 
     @Override

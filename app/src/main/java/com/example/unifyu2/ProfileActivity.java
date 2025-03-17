@@ -71,6 +71,20 @@ public class ProfileActivity extends AppCompatActivity {
                     intent.putExtra("club", club);
                     startActivity(intent);
                 }
+                
+                @Override
+                public void onExitClubClick(Club club) {
+                    // Handle exit club click
+                    new MaterialAlertDialogBuilder(ProfileActivity.this)
+                        .setTitle("Exit Club")
+                        .setMessage("Are you sure you want to exit " + club.getName() + "?")
+                        .setPositiveButton("Exit", (dialog, which) -> {
+                            // Exit club logic
+                            exitClub(club);
+                        })
+                        .setNegativeButton("Cancel", null)
+                        .show();
+                }
             }, 
             FirebaseAuth.getInstance().getCurrentUser().getUid()
         );
@@ -242,6 +256,57 @@ public class ProfileActivity extends AppCompatActivity {
                         Toast.makeText(this, R.string.profile_update_failed, Toast.LENGTH_LONG).show();
                     }
                 });
+    }
+
+    private void exitClub(Club club) {
+        String userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
+        String membershipId = userId + "_" + club.getId();
+        
+        // Show progress
+        progressBar.setVisibility(View.VISIBLE);
+        
+        // Remove membership
+        DatabaseReference membershipsRef = FirebaseDatabase.getInstance().getReference("memberships");
+        membershipsRef.child(membershipId).removeValue()
+            .addOnSuccessListener(aVoid -> {
+                // Decrement member count
+                decrementMemberCount(club.getId());
+            })
+            .addOnFailureListener(e -> {
+                progressBar.setVisibility(View.GONE);
+                Toast.makeText(this,
+                    "Failed to exit club: " + e.getMessage(),
+                    Toast.LENGTH_LONG).show();
+            });
+    }
+    
+    private void decrementMemberCount(String clubId) {
+        DatabaseReference clubRef = FirebaseDatabase.getInstance().getReference("clubs").child(clubId).child("memberCount");
+        clubRef.get().addOnCompleteListener(task -> {
+            if (task.isSuccessful()) {
+                Integer currentCount = task.getResult().getValue(Integer.class);
+                if (currentCount != null && currentCount > 0) {
+                    int newCount = currentCount - 1;
+                    clubRef.setValue(newCount).addOnCompleteListener(updateTask -> {
+                        progressBar.setVisibility(View.GONE);
+                        if (updateTask.isSuccessful()) {
+                            Toast.makeText(this,
+                                "Successfully exited club",
+                                Toast.LENGTH_SHORT).show();
+                            // Refresh the clubs list
+                            loadJoinedClubs();
+                        }
+                    });
+                } else {
+                    progressBar.setVisibility(View.GONE);
+                }
+            } else {
+                progressBar.setVisibility(View.GONE);
+                Toast.makeText(this,
+                    "Error updating member count",
+                    Toast.LENGTH_SHORT).show();
+            }
+        });
     }
 
     @Override
