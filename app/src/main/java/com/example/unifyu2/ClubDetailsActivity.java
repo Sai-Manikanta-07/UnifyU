@@ -121,6 +121,9 @@ public class ClubDetailsActivity extends AppCompatActivity implements ClubMember
     private void loadMembers() {
         try {
             Log.d(TAG, "Starting to load members");
+            membersList.clear();
+            membersAdapter.notifyDataSetChanged();
+            
             DatabaseReference membershipsRef = FirebaseDatabase.getInstance().getReference("memberships");
             
             // Query to find memberships for this club
@@ -130,19 +133,57 @@ public class ClubDetailsActivity extends AppCompatActivity implements ClubMember
                 @Override
                 public void onDataChange(@NonNull DataSnapshot snapshot) {
                     try {
-                        membersList.clear();
+                        List<String> userIds = new ArrayList<>();
                         Log.d(TAG, "Found " + snapshot.getChildrenCount() + " memberships");
                         
+                        // First collect all user IDs
                         for (DataSnapshot membershipSnapshot : snapshot.getChildren()) {
                             String userId = membershipSnapshot.child("userId").getValue(String.class);
                             if (userId != null) {
-                                loadMemberDetails(userId);
+                                userIds.add(userId);
+                                Log.d(TAG, "Added user ID to fetch: " + userId);
                             }
                         }
                         
-                        if (!snapshot.exists() || snapshot.getChildrenCount() == 0) {
+                        if (userIds.isEmpty()) {
                             Log.d(TAG, "No members found for this club");
-                            Toast.makeText(ClubDetailsActivity.this, "No members found", Toast.LENGTH_SHORT).show();
+                            membersList.clear();
+                            membersAdapter.notifyDataSetChanged();
+                            return;
+                        }
+                        
+                        // Create a counter to track when all users are loaded
+                        final int[] loadedCount = {0};
+                        final int totalToLoad = userIds.size();
+                        
+                        // Now load all user details at once
+                        membersList.clear();
+                        for (String userId : userIds) {
+                            loadMemberDetails(userId, (user) -> {
+                                loadedCount[0]++;
+                                
+                                if (user != null) {
+                                    // Add user if not already in the list
+                                    boolean alreadyInList = false;
+                                    for (User existingUser : membersList) {
+                                        if (existingUser.getId().equals(user.getId())) {
+                                            alreadyInList = true;
+                                            break;
+                                        }
+                                    }
+                                    
+                                    if (!alreadyInList) {
+                                        membersList.add(user);
+                                        Log.d(TAG, "Added member: " + user.getUsername() + " (ID: " + user.getId() + ")");
+                                    }
+                                }
+                                
+                                // If all users are loaded, update the UI
+                                if (loadedCount[0] >= totalToLoad) {
+                                    membersAdapter.notifyDataSetChanged();
+                                    Log.d(TAG, "All " + membersList.size() + " members loaded");
+                                }
+                            });
                         }
                     } catch (Exception e) {
                         Log.e(TAG, "Error processing memberships: ", e);
@@ -159,7 +200,12 @@ public class ClubDetailsActivity extends AppCompatActivity implements ClubMember
         }
     }
 
-    private void loadMemberDetails(String userId) {
+    // Using callback to handle asynchronous user loading
+    private interface UserLoadCallback {
+        void onUserLoaded(User user);
+    }
+
+    private void loadMemberDetails(String userId, UserLoadCallback callback) {
         try {
             Log.d(TAG, "Loading details for user: " + userId);
             DatabaseReference userRef = FirebaseDatabase.getInstance().getReference("users").child(userId);
@@ -175,27 +221,30 @@ public class ClubDetailsActivity extends AppCompatActivity implements ClubMember
                             user.setEmail(snapshot.child("email").getValue(String.class));
                             
                             if (user.getUsername() != null) {
-                                membersList.add(user);
-                                Log.d(TAG, "Added member: " + user.getUsername() + " (ID: " + user.getId() + ")");
-                                membersAdapter.notifyDataSetChanged();
+                                callback.onUserLoaded(user);
                             } else {
                                 Log.e(TAG, "Username is null for user: " + userId);
+                                callback.onUserLoaded(null);
                             }
                         } else {
                             Log.e(TAG, "No user data found for ID: " + userId);
+                            callback.onUserLoaded(null);
                         }
                     } catch (Exception e) {
                         Log.e(TAG, "Error processing user details: ", e);
+                        callback.onUserLoaded(null);
                     }
                 }
 
                 @Override
                 public void onCancelled(@NonNull DatabaseError error) {
                     Log.e(TAG, "Error loading user details: " + error.getMessage());
+                    callback.onUserLoaded(null);
                 }
             });
         } catch (Exception e) {
             Log.e(TAG, "Error in loadMemberDetails: ", e);
+            callback.onUserLoaded(null);
         }
     }
 

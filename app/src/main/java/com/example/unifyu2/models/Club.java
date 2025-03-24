@@ -95,4 +95,14 @@ public class Club implements Parcelable {
     
     @PropertyName("adminId")
     public void setAdminId(String adminId) { this.adminId = adminId; }
+    
+    @Override
+    public String toString() {
+        return "Club{" +
+                "id='" + id + '\'' +
+                ", name='" + name + '\'' +
+                ", memberCount=" + memberCount +
+                ", adminId='" + adminId + '\'' +
+                '}';
+    }
 } 

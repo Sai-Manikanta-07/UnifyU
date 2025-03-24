@@ -1,14 +1,20 @@
 package com.example.unifyu2;
 
+import android.Manifest;
 import android.content.Intent;
+import android.content.pm.PackageManager;
+import android.os.Build;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 import android.widget.Toast;
 
+import androidx.activity.result.contract.ActivityResultContracts;
 import androidx.annotation.NonNull;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.core.app.ActivityCompat;
+import androidx.core.content.ContextCompat;
 import androidx.fragment.app.Fragment;
 import androidx.fragment.app.FragmentManager;
 
@@ -26,6 +32,7 @@ import com.example.unifyu2.fragments.ClubFeedFragment;
 import com.example.unifyu2.fragments.ViewClubsFragment;
 import com.example.unifyu2.fragments.ProfileFragment;
 import com.example.unifyu2.fragments.EventsFragment;
+import com.example.unifyu2.notifications.FCMManager;
 
 import java.util.HashSet;
 import java.util.Set;
@@ -48,6 +55,15 @@ public class MainActivity extends AppCompatActivity {
             finish();
             return;
         }
+
+        // Update FCM token for push notifications
+        FCMManager.updateUserToken();
+        
+        // Check notification permissions
+        checkNotificationPermissions();
+        
+        // Debug: Log all tokens in database
+        FCMManager.logAllTokens();
 
         // Initialize FragmentManager
         fragmentManager = getSupportFragmentManager();
@@ -161,5 +177,26 @@ public class MainActivity extends AppCompatActivity {
                         Toast.LENGTH_SHORT).show();
                 }
             });
+    }
+
+    private void checkNotificationPermissions() {
+        // For Android 13 and above, we need to request POST_NOTIFICATIONS permission
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ContextCompat.checkSelfPermission(this, 
+                    Manifest.permission.POST_NOTIFICATIONS) != 
+                    PackageManager.PERMISSION_GRANTED) {
+                
+                // Request the permission
+                ActivityCompat.requestPermissions(this,
+                    new String[]{Manifest.permission.POST_NOTIFICATIONS},
+                    100);
+                
+                Log.d("MainActivity", "Requesting notification permission");
+            } else {
+                Log.d("MainActivity", "Notification permission already granted");
+            }
+        } else {
+            Log.d("MainActivity", "Notification permission not needed for this Android version");
+        }
     }
 }

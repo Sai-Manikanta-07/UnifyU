@@ -7,6 +7,8 @@ import com.google.firebase.database.DatabaseReference;
 import com.google.firebase.database.FirebaseDatabase;
 import com.google.firebase.auth.FirebaseAuth;
 import com.example.unifyu2.utils.ClubMemberCountFixer;
+import com.example.unifyu2.notifications.NotificationHelper;
+import com.example.unifyu2.notifications.FCMManager;
 
 public class UnifyUApplication extends Application {
     private static final String TAG = "UnifyUApplication";
@@ -32,6 +34,9 @@ public class UnifyUApplication extends Application {
         
         // Fix club member counts
         fixClubMemberCounts();
+        
+        // Create notification channel
+        NotificationHelper.createNotificationChannel(this);
     }
     
     private void fixClubMemberCounts() {

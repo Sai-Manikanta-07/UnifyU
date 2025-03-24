@@ -2,6 +2,7 @@ package com.example.unifyu2.fragments;
 
 import android.content.Intent;
 import android.os.Bundle;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -200,6 +201,27 @@ public class ViewClubsFragment extends Fragment implements ClubAdapter.OnClubCli
     @Override
     public void onExitClubClick(Club club) {
         showExitConfirmationDialog(club);
+    }
+    
+    @Override
+    public void onMembershipChanged(Club club) {
+        // Refresh the clubs data when membership status changes
+        Log.d("ViewClubsFragment", "Membership changed for club: " + club.getName());
+        
+        // Update the member count in the clubs list
+        DatabaseReference clubRef = FirebaseDatabase.getInstance()
+            .getReference("clubs").child(club.getId());
+        clubRef.child("memberCount").get().addOnSuccessListener(snapshot -> {
+            if (snapshot.exists()) {
+                Integer newCount = snapshot.getValue(Integer.class);
+                if (newCount != null) {
+                    club.setMemberCount(newCount);
+                }
+            }
+            
+            // Reload the clubs to ensure proper categorization
+            loadClubs();
+        });
     }
     
     private void showExitConfirmationDialog(Club club) {

@@ -108,20 +108,42 @@ public class ProfileFragment extends Fragment {
     }
     
     private void setupTabs() {
-        ProfileTabAdapter adapter = new ProfileTabAdapter(this);
+        // First, we'll check if the user should see the My Posts tab
+        String userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
+        
+        // Default to 2 tabs (My Clubs and My Events)
+        int tabCount = 2;
+        boolean showPostsTab = false;
+        
+        // Create and set up the adapter
+        ProfileTabAdapter adapter = new ProfileTabAdapter(this, tabCount, showPostsTab);
         viewPager.setAdapter(adapter);
+        viewPager.setOffscreenPageLimit(2);
         
         new TabLayoutMediator(tabLayout, viewPager, (tab, position) -> {
-            switch (position) {
-                case 0:
-                    tab.setText("My Clubs");
-                    break;
-                case 1:
-                    tab.setText("My Posts");
-                    break;
-                case 2:
-                    tab.setText("My Events");
-                    break;
+            if (!showPostsTab) {
+                // Without Posts tab (just Clubs and Events)
+                switch (position) {
+                    case 0:
+                        tab.setText("My Clubs");
+                        break;
+                    case 1:
+                        tab.setText("My Events");
+                        break;
+                }
+            } else {
+                // With Posts tab
+                switch (position) {
+                    case 0:
+                        tab.setText("My Clubs");
+                        break;
+                    case 1:
+                        tab.setText("My Posts");
+                        break;
+                    case 2:
+                        tab.setText("My Events");
+                        break;
+                }
             }
         }).attach();
     }
@@ -330,13 +352,15 @@ public class ProfileFragment extends Fragment {
 
     private void loadUserStats(String userId) {
         // Load club count
-        DatabaseReference clubsRef = FirebaseDatabase.getInstance().getReference("clubs");
-        clubsRef.orderByChild("members/" + userId).equalTo(true)
+        DatabaseReference membershipRef = FirebaseDatabase.getInstance().getReference("memberships");
+        membershipRef.orderByChild("userId").equalTo(userId)
             .addListenerForSingleValueEvent(new ValueEventListener() {
                 @Override
                 public void onDataChange(@NonNull DataSnapshot snapshot) {
                     if (isAdded() && getContext() != null) {
-                        clubCountText.setText(String.valueOf(snapshot.getChildrenCount()));
+                        long count = snapshot.getChildrenCount();
+                        clubCountText.setText(String.valueOf(count));
+                        Log.d(TAG, "User is member of " + count + " clubs");
                     }
                 }
 
@@ -353,7 +377,9 @@ public class ProfileFragment extends Fragment {
                 @Override
                 public void onDataChange(@NonNull DataSnapshot snapshot) {
                     if (isAdded() && getContext() != null) {
-                        postsCountText.setText(String.valueOf(snapshot.getChildrenCount()));
+                        long count = snapshot.getChildrenCount();
+                        postsCountText.setText(String.valueOf(count));
+                        Log.d(TAG, "User has " + count + " posts");
                     }
                 }
 

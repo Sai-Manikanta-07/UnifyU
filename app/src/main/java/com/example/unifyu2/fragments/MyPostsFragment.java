@@ -70,16 +70,21 @@ public class MyPostsFragment extends Fragment implements PostAdapter.OnPostInter
         
         postsRef.orderByChild("userId").equalTo(userId)
             .addValueEventListener(new ValueEventListener() {
-                @Override
-                public void onDataChange(@NonNull DataSnapshot snapshot) {
-                    if (!isAdded() || getContext() == null) return;
-                    
+            @Override
+            public void onDataChange(@NonNull DataSnapshot snapshot) {
+                if (!isAdded() || getContext() == null) return;
+                
                     List<Post> posts = new ArrayList<>();
-                    for (DataSnapshot postSnapshot : snapshot.getChildren()) {
-                        Post post = postSnapshot.getValue(Post.class);
-                        if (post != null) {
-                            post.setPostId(postSnapshot.getKey());
-                            posts.add(post);
+                for (DataSnapshot postSnapshot : snapshot.getChildren()) {
+                        try {
+                    Post post = postSnapshot.getValue(Post.class);
+                    if (post != null) {
+                        post.setPostId(postSnapshot.getKey());
+                                posts.add(post);
+                                Log.d(TAG, "Loaded post: " + post.getPostId());
+                            }
+                        } catch (Exception e) {
+                            Log.e(TAG, "Error parsing post: " + postSnapshot.getKey(), e);
                         }
                     }
                     
@@ -97,10 +102,12 @@ public class MyPostsFragment extends Fragment implements PostAdapter.OnPostInter
                         recyclerView.setVisibility(View.GONE);
                         emptyView.setVisibility(View.VISIBLE);
                         emptyView.setText("You haven't created any posts yet");
+                        Log.d(TAG, "No posts found for user: " + userId);
                     } else {
                         recyclerView.setVisibility(View.VISIBLE);
                         emptyView.setVisibility(View.GONE);
                         adapter.setPosts(posts);
+                        Log.d(TAG, "Found " + posts.size() + " posts for user: " + userId);
                     }
                 }
                 
@@ -156,11 +163,11 @@ public class MyPostsFragment extends Fragment implements PostAdapter.OnPostInter
     @Override
     public void onLinkClicked(String url) {
         if (url != null && !url.isEmpty()) {
-            Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
-            startActivity(intent);
+        Intent intent = new Intent(Intent.ACTION_VIEW, Uri.parse(url));
+        startActivity(intent);
         }
     }
-    
+
     @Override
     public void onReactionSelected(Post post, String reactionType) {
         if (!isAdded() || getContext() == null) return;

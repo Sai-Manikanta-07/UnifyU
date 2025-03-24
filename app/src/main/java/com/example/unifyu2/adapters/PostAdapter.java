@@ -67,7 +67,15 @@ public class PostAdapter extends RecyclerView.Adapter<PostAdapter.PostViewHolder
             
             // Set basic post info with null checks
             holder.authorNameText.setText(post.getUserName() != null ? post.getUserName() : "Unknown User");
-            holder.contentText.setText(post.getContent() != null ? post.getContent() : "");
+            
+            // Handle content text
+            String content = post.getContent();
+            if (content != null && !content.trim().isEmpty()) {
+                holder.contentText.setText(content);
+                holder.contentText.setVisibility(View.VISIBLE);
+            } else {
+                holder.contentText.setVisibility(View.GONE);
+            }
             
             // Set club name
             if (post.getClubName() != null && !post.getClubName().isEmpty()) {

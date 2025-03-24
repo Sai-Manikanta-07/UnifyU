@@ -35,6 +35,11 @@
             android:windowSoftInputMode="adjustResize" />
         
         <activity
+            android:name=".ResetPasswordActivity"
+            android:exported="false"
+            android:windowSoftInputMode="adjustResize" />
+        
+        <activity
             android:name=".MainActivity"
             android:exported="false" />
         
@@ -80,8 +85,13 @@
             android:exported="false"
             android:label="All Events" />
         
+        <activity
+            android:name=".ViewEventActivity"
+            android:exported="false"
+            android:label="Event Details" />
+        
         <service
-            android:name=".services.UnifyUMessagingService"
+            android:name=".notifications.MyFirebaseMessagingService"
             android:exported="false">
             <intent-filter>
                 <action android:name="com.google.firebase.MESSAGING_EVENT" />

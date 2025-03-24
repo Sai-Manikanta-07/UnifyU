@@ -72,22 +72,50 @@ public class MyEventsFragment extends Fragment implements EnhancedEventAdapter.O
         recyclerView.setVisibility(View.GONE);
         emptyView.setVisibility(View.GONE);
         
+        Log.d(TAG, "Starting to load events for user: " + userId);
+        
         eventsRef.addValueEventListener(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
                 if (!isAdded() || getContext() == null) return;
                 
+                Log.d(TAG, "Total events found: " + snapshot.getChildrenCount());
+                
                 List<Event> events = new ArrayList<>();
                 for (DataSnapshot eventSnapshot : snapshot.getChildren()) {
-                    Event event = eventSnapshot.getValue(Event.class);
-                    if (event != null) {
-                        event.setEventId(eventSnapshot.getKey());
+                    try {
+                        // Log key for debugging
+                        String eventKey = eventSnapshot.getKey();
+                        Log.d(TAG, "Processing event with key: " + eventKey);
                         
-                        // Check if user is registered for this event
-                        DataSnapshot registeredUsers = eventSnapshot.child("registeredUsers");
-                        if (registeredUsers.hasChild(userId)) {
-                            events.add(event);
+                        Event event = eventSnapshot.getValue(Event.class);
+                        if (event != null) {
+                            event.setEventId(eventKey);
+                            
+                            // There are 3 ways a user might be registered:
+                            // 1. registeredUsers/{userId} = true
+                            // 2. registeredUsers/{userId} = phone number
+                            // 3. registeredUsers/{userId} = registration object
+                            
+                            // First check if the registeredUsers node exists
+                            if (eventSnapshot.hasChild("registeredUsers")) {
+                                DataSnapshot registeredUsers = eventSnapshot.child("registeredUsers");
+                                Log.d(TAG, "Event " + event.getTitle() + " has " + registeredUsers.getChildrenCount() + " registrations");
+                                
+                                if (registeredUsers.hasChild(userId)) {
+                                    Log.d(TAG, "User " + userId + " is registered for event: " + event.getTitle());
+                                    events.add(event);
+                                } else {
+                                    Log.d(TAG, "User " + userId + " is NOT registered for event: " + event.getTitle());
+                                }
+                            } else {
+                                Log.d(TAG, "Event " + event.getTitle() + " has no registeredUsers node");
+                            }
+                        } else {
+                            Log.e(TAG, "Failed to parse event from snapshot: " + eventKey);
                         }
+                    } catch (Exception e) {
+                        Log.e(TAG, "Error parsing event data", e);
                     }
                 }
                 
@@ -95,10 +123,12 @@ public class MyEventsFragment extends Fragment implements EnhancedEventAdapter.O
                 swipeRefreshLayout.setRefreshing(false);
                 
                 if (events.isEmpty()) {
+                    Log.d(TAG, "No registered events found for user: " + userId);
                     recyclerView.setVisibility(View.GONE);
                     emptyView.setVisibility(View.VISIBLE);
                     emptyView.setText("You haven't registered for any events yet");
                 } else {
+                    Log.d(TAG, "Found " + events.size() + " registered events for user");
                     recyclerView.setVisibility(View.VISIBLE);
                     emptyView.setVisibility(View.GONE);
                     adapter.updateEvents(events);

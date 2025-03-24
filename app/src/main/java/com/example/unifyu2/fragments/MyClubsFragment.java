@@ -66,27 +66,42 @@ public class MyClubsFragment extends Fragment implements ClubAdapter.OnClubClick
         String userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
         progressBar.setVisibility(View.VISIBLE);
         
+        Log.d(TAG, "Starting to load clubs for user: " + userId);
+        
         // First get all club memberships for this user
-        DatabaseReference membershipRef = FirebaseDatabase.getInstance().getReference("club_memberships");
+        DatabaseReference membershipRef = FirebaseDatabase.getInstance().getReference("memberships");
+        Log.d(TAG, "Querying memberships at path: " + membershipRef.toString());
+        
         membershipRef.orderByChild("userId").equalTo(userId).addValueEventListener(new ValueEventListener() {
             @Override
             public void onDataChange(@NonNull DataSnapshot snapshot) {
                 if (!isAdded() || getContext() == null) return;
                 
+                Log.d(TAG, "Membership snapshot exists: " + snapshot.exists());
+                Log.d(TAG, "Membership snapshot count: " + snapshot.getChildrenCount());
+                
                 List<String> clubIds = new ArrayList<>();
                 for (DataSnapshot membershipSnapshot : snapshot.getChildren()) {
+                    Log.d(TAG, "Membership key: " + membershipSnapshot.getKey());
+                    
                     ClubMembership membership = membershipSnapshot.getValue(ClubMembership.class);
                     if (membership != null) {
+                        Log.d(TAG, "Found membership with clubId: " + membership.getClubId());
                         clubIds.add(membership.getClubId());
+                    } else {
+                        Log.e(TAG, "Failed to parse membership from: " + membershipSnapshot.getKey());
                     }
                 }
                 
                 if (clubIds.isEmpty()) {
+                    Log.d(TAG, "No club IDs found for user");
                     noClubsText.setVisibility(View.VISIBLE);
                     recyclerView.setVisibility(View.GONE);
                     progressBar.setVisibility(View.GONE);
                     return;
                 }
+                
+                Log.d(TAG, "Found " + clubIds.size() + " club IDs: " + clubIds);
                 
                 // Now fetch the club details for each club ID
                 loadClubDetails(clubIds);
@@ -105,23 +120,48 @@ public class MyClubsFragment extends Fragment implements ClubAdapter.OnClubClick
     private void loadClubDetails(List<String> clubIds) {
         clubList.clear();
         DatabaseReference clubsRef = FirebaseDatabase.getInstance().getReference("clubs");
+        Log.d(TAG, "Loading club details from: " + clubsRef.toString());
+        
+        // Add a counter to track completion
+        final int[] totalClubs = {clubIds.size()};
+        final int[] loadedClubs = {0};
         
         for (String clubId : clubIds) {
+            Log.d(TAG, "Loading club with ID: " + clubId);
+            
             clubsRef.child(clubId).addListenerForSingleValueEvent(new ValueEventListener() {
                 @Override
                 public void onDataChange(@NonNull DataSnapshot snapshot) {
                     if (!isAdded() || getContext() == null) return;
                     
-                    Club club = snapshot.getValue(Club.class);
-                    if (club != null) {
-                        clubList.add(club);
-                        adapter.notifyDataSetChanged();
-                        
-                        noClubsText.setVisibility(View.GONE);
-                        recyclerView.setVisibility(View.VISIBLE);
+                    loadedClubs[0]++;
+                    Log.d(TAG, "Club snapshot exists: " + snapshot.exists() + " for ID: " + clubId);
+                    
+                    try {
+                        Club club = snapshot.getValue(Club.class);
+                        if (club != null) {
+                            club.setId(snapshot.getKey());
+                            clubList.add(club);
+                            Log.d(TAG, "Added club to list: " + club.getName() + " (ID: " + club.getId() + ")");
+                            
+                            noClubsText.setVisibility(View.GONE);
+                            recyclerView.setVisibility(View.VISIBLE);
+                        } else {
+                            Log.e(TAG, "Failed to parse club from snapshot for ID: " + clubId);
+                        }
+                    } catch (Exception e) {
+                        Log.e(TAG, "Error parsing club data: " + e.getMessage());
                     }
                     
-                    if (clubList.size() == clubIds.size()) {
+                    Log.d(TAG, "Loaded " + loadedClubs[0] + " of " + totalClubs[0] + " clubs");
+                    
+                    // When all clubs are loaded, update the adapter
+                    if (loadedClubs[0] >= totalClubs[0]) {
+                        Log.d(TAG, "All " + clubList.size() + " clubs loaded, updating adapter");
+                        Log.d(TAG, "Club list contents: " + clubList.toString());
+                        adapter = new ClubAdapter(clubList, MyClubsFragment.this, 
+                                FirebaseAuth.getInstance().getCurrentUser().getUid());
+                        recyclerView.setAdapter(adapter);
                         progressBar.setVisibility(View.GONE);
                     }
                 }
@@ -129,8 +169,16 @@ public class MyClubsFragment extends Fragment implements ClubAdapter.OnClubClick
                 @Override
                 public void onCancelled(@NonNull DatabaseError error) {
                     if (!isAdded() || getContext() == null) return;
-                    Log.e(TAG, "Database error: ", error.toException());
-                    progressBar.setVisibility(View.GONE);
+                    Log.e(TAG, "Database error for club " + clubId + ": ", error.toException());
+                    
+                    loadedClubs[0]++;
+                    if (loadedClubs[0] >= totalClubs[0]) {
+                        progressBar.setVisibility(View.GONE);
+                        if (clubList.isEmpty()) {
+                            noClubsText.setVisibility(View.VISIBLE);
+                            recyclerView.setVisibility(View.GONE);
+                        }
+                    }
                 }
             });
         }
@@ -153,6 +201,13 @@ public class MyClubsFragment extends Fragment implements ClubAdapter.OnClubClick
         showExitConfirmationDialog(club);
     }
     
+    @Override
+    public void onMembershipChanged(Club club) {
+        // Refresh the clubs list when membership status changes
+        Log.d(TAG, "Membership changed for club: " + club.getName());
+        loadMyClubs();
+    }
+    
     private void showExitConfirmationDialog(Club club) {
         new MaterialAlertDialogBuilder(requireContext())
             .setTitle("Exit Club")
@@ -170,7 +225,7 @@ public class MyClubsFragment extends Fragment implements ClubAdapter.OnClubClick
         progressBar.setVisibility(View.VISIBLE);
         
         // Remove membership
-        DatabaseReference membershipsRef = FirebaseDatabase.getInstance().getReference("club_memberships");
+        DatabaseReference membershipsRef = FirebaseDatabase.getInstance().getReference("memberships");
         membershipsRef.child(membershipId).removeValue()
             .addOnSuccessListener(aVoid -> {
                 // Decrement member count

@@ -85,6 +85,12 @@ public class ProfileActivity extends AppCompatActivity {
                         .setNegativeButton("Cancel", null)
                         .show();
                 }
+                
+                @Override
+                public void onMembershipChanged(Club club) {
+                    // Refresh the joined clubs list when membership status changes
+                    loadJoinedClubs();
+                }
             }, 
             FirebaseAuth.getInstance().getCurrentUser().getUid()
         );

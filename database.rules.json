@@ -42,7 +42,7 @@
     "events": {
       ".read": "auth != null",
       "$eventId": {
-        ".write": "auth != null && (!data.exists() || data.child('adminId').val() === auth.uid)",
+        ".write": "auth != null && (!data.exists() || data.child('adminId').val() === auth.uid || root.child('clubs').child(data.child('clubId').val()).child('adminId').val() === auth.uid)",
         ".validate": "newData.hasChildren(['clubId', 'title', 'description', 'venue', 'date', 'maxParticipants'])",
         "registeredUsers": {
           "$userId": {

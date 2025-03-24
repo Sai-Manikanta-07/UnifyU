@@ -16,6 +16,7 @@ import com.google.firebase.auth.FirebaseUser;
 
 import com.example.unifyu2.utils.FirebaseErrorUtils;
 import com.example.unifyu2.utils.ClubMemberCountFixer;
+import com.example.unifyu2.notifications.FCMManager;
 
 public class LoginActivity extends AppCompatActivity {
     private static final String TAG = "LoginActivity";
@@ -57,6 +58,11 @@ public class LoginActivity extends AppCompatActivity {
             startActivity(new Intent(LoginActivity.this, RegisterActivity.class));
             finish();
         });
+        
+        // Add forgot password click listener
+        findViewById(R.id.forgotPasswordText).setOnClickListener(v -> {
+            startActivity(new Intent(LoginActivity.this, ResetPasswordActivity.class));
+        });
     }
 
     private void attemptLogin() {
@@ -81,11 +87,16 @@ public class LoginActivity extends AppCompatActivity {
                 .addOnCompleteListener(this, task -> {
                     progressDialog.dismiss();
                     if (task.isSuccessful()) {
-                        // Fix club member counts
-                        fixClubMemberCounts();
+                        // Sign in success, update UI with the signed-in user's information
+                        Log.d(TAG, "signInWithEmail:success");
+                        FirebaseUser user = firebaseAuth.getCurrentUser();
                         
-                        // Login success, navigate to MainActivity
-                        startActivity(new Intent(LoginActivity.this, MainActivity.class));
+                        // Update FCM token for push notifications
+                        FCMManager.updateUserToken();
+                        
+                        // Start MainActivity
+                        Intent intent = new Intent(LoginActivity.this, MainActivity.class);
+                        startActivity(intent);
                         finish();
                     } else {
                         String errorMessage = FirebaseErrorUtils.getErrorMessage(

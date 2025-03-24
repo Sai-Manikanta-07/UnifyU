@@ -67,4 +67,6 @@
     <string name="club_members">Club Members</string>
     <string name="close">Close</string>
     <string name="events">Events</string>
+    <string name="admin_status">Admin</string>
+    <string name="member_status">Member</string>
 </resources>

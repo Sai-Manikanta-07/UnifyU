@@ -75,7 +75,6 @@
                 android:id="@+id/contentText"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginBottom="12dp"
                 android:textSize="15sp"
                 android:lineSpacingMultiplier="1.2"
                 android:textColor="?android:attr/textColorPrimary"
@@ -85,9 +84,11 @@
             <ImageView
                 android:id="@+id/postImage"
                 android:layout_width="match_parent"
-                android:layout_height="200dp"
+                android:layout_height="wrap_content"
+                android:maxHeight="200dp"
                 android:adjustViewBounds="true"
-                android:scaleType="centerCrop"
+                android:scaleType="fitCenter"
+                android:layout_marginTop="8dp"
                 android:visibility="gone"
                 tools:visibility="visible"
                 tools:src="@tools:sample/backgrounds/scenic"/>
@@ -143,7 +144,7 @@
                 android:id="@+id/reactionCountText"
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="8dp"
                 android:textSize="12sp"
                 android:textColor="?android:attr/textColorSecondary"
                 tools:text="5 reactions"/>

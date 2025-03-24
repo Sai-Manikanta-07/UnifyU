@@ -182,6 +182,12 @@ public class ViewClubsActivity extends AppCompatActivity implements ClubAdapter.
             .show();
     }
     
+    @Override
+    public void onMembershipChanged(Club club) {
+        // Refresh the clubs list when membership status changes
+        loadClubs();
+    }
+    
     private void exitClub(Club club) {
         String userId = FirebaseAuth.getInstance().getCurrentUser().getUid();
         String membershipId = userId + "_" + club.getId();
