@@ -97,6 +97,15 @@ public class Post {
     public Object getTimestamp() { return timestamp; }
     public void setTimestamp(Object timestamp) { this.timestamp = timestamp; }
 
+    public Long getTimestampLong() {
+        if (timestamp instanceof Long) {
+            return (Long) timestamp;
+        } else if (timestamp instanceof Number) {
+            return ((Number) timestamp).longValue();
+        }
+        return 0L; // Default value if timestamp is not a number
+    }
+
     public String getPostType() { 
         if (postType == null) {
             // Infer post type if not set
