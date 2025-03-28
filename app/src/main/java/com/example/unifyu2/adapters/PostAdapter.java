@@ -215,24 +215,31 @@ public class PostAdapter extends RecyclerView.Adapter<PostAdapter.PostViewHolder
                 switch (userReaction) {
                     case "LIKE":
                         holder.likeButton.setText("Liked");
+                        holder.reactButton.setText("👍");
                         break;
                     case "LOVE":
                         holder.likeButton.setText("Loved");
+                        holder.reactButton.setText("❤️");
                         break;
                     case "HAHA":
                         holder.likeButton.setText("Haha");
+                        holder.reactButton.setText("😂");
                         break;
                     case "WOW":
                         holder.likeButton.setText("Wow");
+                        holder.reactButton.setText("😮");
                         break;
                     case "SAD":
                         holder.likeButton.setText("Sad");
+                        holder.reactButton.setText("😢");
                         break;
                     case "ANGRY":
                         holder.likeButton.setText("Angry");
+                        holder.reactButton.setText("😠");
                         break;
                     default:
                         holder.likeButton.setText("Like");
+                        holder.reactButton.setText("😊");
                         break;
                 }
             } else {
@@ -243,12 +250,15 @@ public class PostAdapter extends RecyclerView.Adapter<PostAdapter.PostViewHolder
                 holder.likeButton.setTextColor(color);
                 holder.likeButton.setIconTint(ContextCompat.getColorStateList(context, colorRes));
                 holder.likeButton.setText("Like");
+                holder.reactButton.setText("😊");
             }
         } catch (Exception e) {
             // Set default state
             holder.reactionCountText.setText("0 reactions");
             holder.likeButton.setTextColor(ContextCompat.getColor(context, android.R.color.darker_gray));
             holder.likeButton.setIconTint(ContextCompat.getColorStateList(context, android.R.color.darker_gray));
+            holder.likeButton.setText("Like");
+            holder.reactButton.setText("😊");
         }
     }
 
