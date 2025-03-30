@@ -1,7 +1,18 @@
 const functions = require('firebase-functions');
 const admin = require('firebase-admin');
+const nodemailer = require('nodemailer');
 
+// Initialize Firebase Admin
 admin.initializeApp();
+
+// Create a transporter using SMTP
+const transporter = nodemailer.createTransport({
+    service: 'gmail',
+    auth: {
+        user: functions.config().email.user,
+        pass: functions.config().email.pass
+    }
+});
 
 // Handle individual user notifications
 exports.sendNotification = functions.database
@@ -189,6 +200,86 @@ exports.notifyNewEvent = functions.database
         } catch (error) {
             console.error('Error sending event notification:', error);
             console.error('Error details:', error.message);
+            return null;
+        }
+    });
+
+// Send email notifications when a new event is created
+exports.sendEventEmailNotifications = functions.database
+    .ref('/events/{eventId}')
+    .onCreate(async (snapshot, context) => {
+        const eventId = context.params.eventId;
+        const event = snapshot.val();
+
+        if (!event) {
+            console.log('No event data');
+            return null;
+        }
+
+        console.log('New event created:', eventId);
+        console.log('Event data:', event);
+
+        try {
+            // Get club details
+            const clubSnapshot = await admin.database().ref(`/clubs/${event.clubId}`).once('value');
+            const club = clubSnapshot.val();
+            const clubName = club ? club.name : 'Club';
+
+            // Get all users
+            const usersSnapshot = await admin.database().ref('/users').once('value');
+            const users = usersSnapshot.val();
+
+            if (!users) {
+                console.log('No users found');
+                return null;
+            }
+
+            // Prepare email content
+            const eventDate = new Date(event.date).toLocaleString();
+            const emailSubject = `New Event: ${event.title}`;
+            const emailBody = `
+                A new event has been created in ${clubName}!
+
+                Event Details:
+                Title: ${event.title}
+                Description: ${event.description}
+                Venue: ${event.venue}
+                Date: ${eventDate}
+                Max Participants: ${event.maxParticipants}
+
+                Log in to the UnifyU app to register for this event!
+            `;
+
+            // Send emails to all users
+            const emailPromises = Object.values(users).map(user => {
+                if (!user.email) return Promise.resolve();
+                
+                const mailOptions = {
+                    from: '"UnifyU" <noreply@unifyu.com>',
+                    to: user.email,
+                    subject: emailSubject,
+                    text: emailBody,
+                    html: emailBody.replace(/\n/g, '<br>')
+                };
+
+                return transporter.sendMail(mailOptions)
+                    .then(() => console.log(`Email sent to ${user.email}`))
+                    .catch(error => console.error(`Error sending email to ${user.email}:`, error));
+            });
+
+            // Wait for all emails to be sent
+            await Promise.all(emailPromises);
+            console.log('All event notification emails sent successfully');
+
+            // Track email notifications in the database
+            await admin.database().ref(`events/${eventId}/emailNotifications`).push({
+                sentAt: Date.now(),
+                recipientCount: Object.keys(users).length
+            });
+
+            return null;
+        } catch (error) {
+            console.error('Error sending event notification emails:', error);
             return null;
         }
     }); 
